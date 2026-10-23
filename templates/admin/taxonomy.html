@@ -8,6 +8,19 @@
 <p class="petunjuk">Versi taksonomi: <strong>{{ taxonomy_version }}</strong>.
 Topik yang sama tampil di dua lab lewat satu baris data dan satu daftar kata kunci.</p>
 
+<div class="kotak-kerja">
+  <div>
+    <h2>Klasifikasi ulang</h2>
+    <p class="bantuan">Setelah kata kunci berubah, jalankan klasifikasi ulang agar label
+    paper dan skripsi mengikuti versi taksonomi terbaru. Label manual yang dikunci tidak
+    akan ditimpa.</p>
+  </div>
+  <form method="post" action="/admin/taksonomi/reklasifikasi">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="tombol">Buat job klasifikasi ulang</button>
+  </form>
+</div>
+
 {% if rows %}
 <div class="tabel-scroll">
   <table>

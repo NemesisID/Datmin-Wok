@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 
+from app.classify import mark_not_relevant, reclassify_papers, set_manual_label
 from app.config import get_settings
 from app.db import get_session
 from app.dedupe import merge_paper_into
@@ -20,6 +21,7 @@ from app.models import (
     PaperDuplicate,
     PaperTopic,
     SyncJob,
+    Thesis,
     Topic,
     TopicKeyword,
     TopicLab,
@@ -27,6 +29,7 @@ from app.models import (
 )
 from app.providers.manual import ManualImportProvider
 from app.providers.openalex import build_client
+from app.review import pending_papers, pending_theses, review_counts
 from app.security import (
     LoginRateLimiter,
     csrf_ok,
@@ -143,6 +146,7 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
         select(PaperDuplicate).where(PaperDuplicate.status == "pending")
     ).all()
     pending_jobs = session.exec(select(SyncJob).where(SyncJob.status == "pending")).all()
+    review_paper_count, review_thesis_count = review_counts(session)
     return render(
         request,
         "admin/dashboard.html",
@@ -154,6 +158,7 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
             "papers": len(session.exec(select(Paper)).all()),
             "duplicates": len(duplicates),
             "pending_jobs": len(pending_jobs),
+            "review": review_paper_count + review_thesis_count,
             "taxonomy_version": get_taxonomy_version(session),
         },
     )
@@ -449,6 +454,7 @@ async def lecturer_import(
         provider = ManualImportProvider(filename, content, client=client)
         result = provider.fetch(lecturer, [], publication_window_start(settings))
         stats = store_papers(session, lecturer, result.papers, provider.name)
+        reclassify_papers(session, paper_ids=stats.touched)
     except ValueError as error:
         _fail_job(session, job_id, str(error))
         flash(request, str(error))
@@ -580,6 +586,136 @@ def duplicate_keep(
     return _redirect("/admin/duplikat")
 
 
+def _review_options(session: Session) -> tuple[list[Topic], list[dict[str, object]]]:
+    roots = sorted(
+        session.exec(select(Topic).where(Topic.parent_id.is_(None), Topic.active.is_(True))).all(),
+        key=lambda item: (item.sort_order, item.name),
+    )
+    children = session.exec(
+        select(Topic)
+        .where(Topic.parent_id.is_not(None), Topic.active.is_(True))
+        .order_by(Topic.sort_order, Topic.name)
+    ).all()
+    names = {topic.id: topic.name for topic in roots}
+    subtopics = [
+        {
+            "id": child.id,
+            "name": child.name,
+            "parent_name": names.get(child.parent_id, ""),
+        }
+        for child in children
+    ]
+    return roots, subtopics
+
+
+@router.get("/review")
+def review_page(
+    request: Request,
+    offset: int = 0,
+    session: Session = Depends(get_session),
+):
+    limit = 50
+    papers, paper_total = pending_papers(session, offset=max(offset, 0), limit=limit)
+    theses, thesis_total = pending_theses(session, offset=max(offset, 0), limit=limit)
+    roots, subtopics = _review_options(session)
+    return render(
+        request,
+        "admin/review.html",
+        papers=papers,
+        theses=theses,
+        paper_total=paper_total,
+        thesis_total=thesis_total,
+        offset=offset,
+        limit=limit,
+        roots=roots,
+        subtopics=subtopics,
+        taxonomy_version=get_taxonomy_version(session),
+    )
+
+
+def _manual_topic_from_form(
+    request: Request, session: Session, topic_id: str, subtopic_id: str
+) -> tuple[int, int | None] | None:
+    try:
+        topic = int(topic_id)
+    except ValueError:
+        flash(request, "Pilih topik terlebih dahulu.")
+        return None
+    subtopic = None
+    if subtopic_id.strip():
+        try:
+            subtopic = int(subtopic_id)
+        except ValueError:
+            flash(request, "Sub-topik tidak valid.")
+            return None
+    if session.get(Topic, topic) is None:
+        flash(request, "Topik tidak ditemukan.")
+        return None
+    return topic, subtopic
+
+
+@router.post("/review/paper/{paper_id}")
+def review_paper(
+    request: Request,
+    paper_id: int,
+    topic_id: str = Form(""),
+    subtopic_id: str = Form(""),
+    tidak_relevan: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    paper = session.get(Paper, paper_id)
+    if paper is None:
+        flash(request, "Paper tidak ditemukan.")
+        return _redirect("/admin/review")
+    if tidak_relevan:
+        mark_not_relevant(session, paper=paper)
+        flash(request, "Paper ditandai tidak relevan dengan topik mana pun.")
+        return _redirect("/admin/review")
+
+    parsed = _manual_topic_from_form(request, session, topic_id, subtopic_id)
+    if parsed is None:
+        return _redirect("/admin/review")
+    topic, subtopic = parsed
+    try:
+        set_manual_label(session, paper=paper, topic_id=topic, subtopic_id=subtopic)
+    except ValueError as error:
+        flash(request, str(error))
+        return _redirect("/admin/review")
+    flash(request, "Topik manual disimpan dan dikunci.")
+    return _redirect("/admin/review")
+
+
+@router.post("/review/thesis/{thesis_id}")
+def review_thesis(
+    request: Request,
+    thesis_id: int,
+    topic_id: str = Form(""),
+    subtopic_id: str = Form(""),
+    tidak_relevan: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    thesis = session.get(Thesis, thesis_id)
+    if thesis is None:
+        flash(request, "Skripsi tidak ditemukan.")
+        return _redirect("/admin/review")
+    if tidak_relevan:
+        mark_not_relevant(session, thesis=thesis)
+        flash(request, "Skripsi ditandai tidak relevan dengan topik mana pun.")
+        return _redirect("/admin/review")
+
+    parsed = _manual_topic_from_form(request, session, topic_id, subtopic_id)
+    if parsed is None:
+        return _redirect("/admin/review")
+    topic, subtopic = parsed
+    try:
+        set_manual_label(session, thesis=thesis, topic_id=topic, subtopic_id=subtopic)
+    except ValueError as error:
+        flash(request, str(error))
+        return _redirect("/admin/review")
+    flash(request, "Topik manual disimpan dan dikunci.")
+    return _redirect("/admin/review")
+
+
 def _taxonomy_rows(session: Session) -> list[dict[str, object]]:
     topics = session.exec(select(Topic).order_by(Topic.sort_order, Topic.name)).all()
     labs: dict[int, list[str]] = defaultdict(list)
@@ -623,6 +759,25 @@ def taxonomy_list(request: Request, session: Session = Depends(get_session)):
         roots=sorted(roots, key=lambda item: (item.sort_order, item.name)),
         taxonomy_version=get_taxonomy_version(session),
     )
+
+
+@router.post("/taksonomi/reklasifikasi")
+def taxonomy_reclassify(request: Request, session: Session = Depends(get_session)):
+    existing = session.exec(
+        select(SyncJob).where(SyncJob.source == "reclassify", SyncJob.status == "pending")
+    ).first()
+    job = existing
+    if job is None:
+        job = SyncJob(source="reclassify", status="pending")
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+    flash(
+        request,
+        f"Job klasifikasi ulang #{job.id} dibuat. Jalankan "
+        "`uv run python -m app.jobs reclassify` untuk memproses.",
+    )
+    return _redirect("/admin/taksonomi")
 
 
 @router.get("/taksonomi/baru")

@@ -72,6 +72,7 @@ class Paper(SQLModel, table=True):
     scholar_pub_id: str | None = Field(default=None, index=True)
     openalex_id: str | None = Field(default=None, unique=True)
     sources: list[str] | None = Field(default=None, sa_column=Column(JSON))
+    reviewed_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
@@ -152,6 +153,7 @@ class Thesis(SQLModel, table=True):
     nim: str = ""
     year: int | None = Field(default=None, index=True)
     import_batch_id: int | None = Field(default=None, foreign_key="import_batches.id")
+    reviewed_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 

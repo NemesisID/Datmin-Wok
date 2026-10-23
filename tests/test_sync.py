@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
+from factories import seed_minimal_taxonomy
 from sqlmodel import Session, select
 
 from app.config import Settings
@@ -12,6 +13,7 @@ from app.models import (
     LecturerPaper,
     Paper,
     PaperDuplicate,
+    PaperTopic,
     SyncJob,
     utcnow,
 )
@@ -245,6 +247,18 @@ def test_publication_window_handles_leap_day() -> None:
     settings = Settings(publication_window_years=3)
     assert publication_window_start(settings, date(2024, 2, 29)) == date(2021, 2, 28)
     assert publication_window_start(settings, date(2026, 10, 23)) == SINCE
+
+
+def test_sync_classifies_newly_stored_paper(session: Session) -> None:
+    taxonomy = seed_minimal_taxonomy(session)
+    make_lecturer(session, "Dosen Satu")
+    provider = FakeProvider([RawPaper(title="Klasifikasi data mining untuk UMKM", year=2025)])
+
+    run_jobs(session, provider, SINCE, now=NOW)
+
+    paper = session.exec(select(Paper)).one()
+    labels = session.exec(select(PaperTopic).where(PaperTopic.paper_id == paper.id)).all()
+    assert [label.topic_id for label in labels] == [taxonomy["Data Mining"].id]
 
 
 def test_utcnow_is_timezone_aware() -> None:

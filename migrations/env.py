@@ -19,6 +19,12 @@ if config.config_file_name is not None:
 target_metadata = SQLModel.metadata
 
 
+def include_object(object, name, type_, reflected, compare_to) -> bool:
+    # Tabel FTS5 dan tabel bayangannya dikelola manual di migrasi, bukan oleh metadata.
+    is_fts = type_ == "table" and name and (name == "papers_fts" or name.startswith("papers_fts_"))
+    return not is_fts
+
+
 def _url() -> str:
     settings = get_settings()
     settings.database_path.parent.mkdir(parents=True, exist_ok=True)
@@ -29,6 +35,7 @@ def run_migrations_offline() -> None:
     context.configure(
         url=_url(),
         target_metadata=target_metadata,
+        include_object=include_object,
         literal_binds=True,
         render_as_batch=True,
         dialect_opts={"paramstyle": "named"},
@@ -49,6 +56,7 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
+            include_object=include_object,
             render_as_batch=True,
         )
         with context.begin_transaction():

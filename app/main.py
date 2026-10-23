@@ -66,7 +66,7 @@ def health() -> dict[str, object]:
     current = get_settings()
     return {
         "status": "ok",
-        "phase": 2,
+        "phase": 3,
         "publication_window_years": current.publication_window_years,
     }
 

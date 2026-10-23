@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Review klasifikasi · {{ app_name }}{% endblock %}
+{% block scripts %}<script src="/static/admin_review.js" defer></script>{% endblock %}
+{% block content %}
+<div class="judul-halaman">
+  <h1>Review klasifikasi</h1>
+  <a class="tombol sekunder" href="/admin/taksonomi">Buka taksonomi</a>
+</div>
+<p class="petunjuk">Tinjau paper dan skripsi yang belum punya topik, keyakinannya rendah,
+atau dua topik teratasnya berdekatan. Pilihan manual disimpan sebagai label terkunci dan
+tidak akan ditimpa klasifikasi ulang.</p>
+<p class="bantuan papan-ketik">Keyboard: <strong>j</strong>/<strong>k</strong> pindah kartu,
+<strong>1–9</strong> pilih topik, <strong>x</strong> tandai tidak relevan,
+<strong>Enter</strong> simpan. Versi taksonomi {{ taxonomy_version }}.</p>
+
+<section aria-labelledby="judul-paper">
+  <h2 id="judul-paper">Paper ({{ paper_total }})</h2>
+  {% if papers %}
+    {% for item in papers %}
+    <article class="kartu-review" tabindex="-1" data-review-card>
+      <h3>{{ item.title }}</h3>
+      <p class="kecil">{{ item.year or "tahun belum ada" }} · {{ item.reason }}</p>
+      <p class="label-sekarang">
+        {% if item.labels %}
+          {% for label in item.labels %}
+          <span class="lencana">{{ label.topic_name }}{% if label.subtopic_name %} · {{ label.subtopic_name }}{% endif %}
+            ({{ "%.2f"|format(label.confidence) }}{% if label.locked %}, terkunci{% endif %})</span>
+          {% endfor %}
+        {% else %}
+          <span class="kecil">Belum ada label.</span>
+        {% endif %}
+      </p>
+      <form method="post" action="/admin/review/{{ item.kind }}/{{ item.id }}" class="formulir baris">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field tumbuh">
+          <label for="topik-{{ item.kind }}-{{ item.id }}">Topik</label>
+          <select id="topik-{{ item.kind }}-{{ item.id }}" name="topic_id" data-topic-select>
+            <option value="">— pilih topik —</option>
+            {% for topic in roots %}
+            <option value="{{ topic.id }}">{{ loop.index }}. {{ topic.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% if item.kind == "paper" %}
+        <div class="field tumbuh">
+          <label for="sub-{{ item.kind }}-{{ item.id }}">Sub-topik (opsional)</label>
+          <select id="sub-{{ item.kind }}-{{ item.id }}" name="subtopic_id">
+            <option value="">— tanpa sub-topik —</option>
+            {% for sub in subtopics %}
+            <option value="{{ sub.id }}">{{ sub.parent_name }} — {{ sub.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <label class="pilihan">
+          <input type="checkbox" name="tidak_relevan" value="1"> Tidak relevan (x)
+        </label>
+        <button type="submit" class="tombol">Simpan</button>
+      </form>
+    </article>
+    {% endfor %}
+  {% else %}
+  <p class="kosong">Tidak ada paper yang menunggu review.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="judul-skripsi">
+  <h2 id="judul-skripsi">Skripsi ({{ thesis_total }})</h2>
+  {% if theses %}
+    {% for item in theses %}
+    <article class="kartu-review" tabindex="-1" data-review-card>
+      <h3>{{ item.title }}</h3>
+      <p class="kecil">{{ item.year or "tahun belum ada" }} · {{ item.reason }}</p>
+      <p class="label-sekarang">
+        {% if item.labels %}
+          {% for label in item.labels %}
+          <span class="lencana">{{ label.topic_name }}{% if label.subtopic_name %} · {{ label.subtopic_name }}{% endif %}
+            ({{ "%.2f"|format(label.confidence) }}{% if label.locked %}, terkunci{% endif %})</span>
+          {% endfor %}
+        {% else %}
+          <span class="kecil">Belum ada label.</span>
+        {% endif %}
+      </p>
+      <form method="post" action="/admin/review/{{ item.kind }}/{{ item.id }}" class="formulir baris">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="field tumbuh">
+          <label for="topik-{{ item.kind }}-{{ item.id }}">Topik</label>
+          <select id="topik-{{ item.kind }}-{{ item.id }}" name="topic_id" data-topic-select>
+            <option value="">— pilih topik —</option>
+            {% for topic in roots %}
+            <option value="{{ topic.id }}">{{ loop.index }}. {{ topic.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% if item.kind == "paper" %}
+        <div class="field tumbuh">
+          <label for="sub-{{ item.kind }}-{{ item.id }}">Sub-topik (opsional)</label>
+          <select id="sub-{{ item.kind }}-{{ item.id }}" name="subtopic_id">
+            <option value="">— tanpa sub-topik —</option>
+            {% for sub in subtopics %}
+            <option value="{{ sub.id }}">{{ sub.parent_name }} — {{ sub.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <label class="pilihan">
+          <input type="checkbox" name="tidak_relevan" value="1"> Tidak relevan (x)
+        </label>
+        <button type="submit" class="tombol">Simpan</button>
+      </form>
+    </article>
+    {% endfor %}
+  {% else %}
+  <p class="kosong">Tidak ada skripsi yang menunggu review.</p>
+  {% endif %}
+</section>
+
+{% if offset > 0 or paper_total > limit or thesis_total > limit %}
+<nav class="paginasi" aria-label="Halaman review">
+  {% if offset > 0 %}
+  <a class="tombol sekunder" href="/admin/review?offset={{ [offset - limit, 0]|max }}">Sebelumnya</a>
+  {% endif %}
+  {% if paper_total > offset + limit or thesis_total > offset + limit %}
+  <a class="tombol sekunder" href="/admin/review?offset={{ offset + limit }}">Berikutnya</a>
+  {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 
 from sqlmodel import Session, select
 
+from app.classify import reclassify_papers
 from app.config import Settings
 from app.dedupe import find_match, merge_raw_into, paper_from_raw
 from app.models import (
@@ -29,6 +30,7 @@ class StoreStats:
     new: int = 0
     merged: int = 0
     duplicates: int = 0
+    touched: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -115,10 +117,13 @@ def store_papers(
         if not raw.title.strip():
             continue
         match = find_match(session, raw)
+        needs_classify = True
         if match.paper is not None:
             paper = match.paper
             if merge_raw_into(paper, raw, source):
                 stats.merged += 1
+            else:
+                needs_classify = False
             session.add(paper)
         else:
             paper = paper_from_raw(raw, source)
@@ -135,6 +140,8 @@ def store_papers(
                 )
                 stats.duplicates += 1
         _ensure_link(session, lecturer.id, paper.id)
+        if needs_classify and paper.id not in stats.touched:
+            stats.touched.append(paper.id)
     session.commit()
     return stats
 
@@ -159,6 +166,7 @@ def run_job(
     try:
         result = provider.fetch(lecturer, author_ids, since)
         stats = store_papers(session, lecturer, result.papers, provider.name)
+        reclassify_papers(session, paper_ids=stats.touched)
     except Exception as error:
         session.rollback()
         failed = session.get(SyncJob, job.id)

@@ -19,7 +19,10 @@ def test_migrations_create_core_tables(tmp_path, monkeypatch) -> None:
         command.upgrade(config, "head")
 
         engine = create_engine(f"sqlite:///{database}")
-        tables = set(inspect(engine).get_table_names())
+        inspector = inspect(engine)
+        tables = set(inspector.get_table_names())
+        paper_columns = {column["name"] for column in inspector.get_columns("papers")}
+        thesis_columns = {column["name"] for column in inspector.get_columns("theses")}
         engine.dispose()
     finally:
         get_settings.cache_clear()
@@ -36,4 +39,7 @@ def test_migrations_create_core_tables(tmp_path, monkeypatch) -> None:
         "theses",
         "sync_jobs",
         "meta",
+        "papers_fts",
     } <= tables
+    assert "reviewed_at" in paper_columns
+    assert "reviewed_at" in thesis_columns

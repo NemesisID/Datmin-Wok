@@ -45,4 +45,8 @@ Fase 2 selesai: sinkronisasi OpenAlex lewat `sync_jobs` dan CLI `python -m app.j
 impor CSV/BibTeX Scholar, deduplikasi berbasis DOI/ID/judul, serta antrean duplikat
 untuk judul yang mirip 90 sampai 100 persen pada tahun yang sama.
 
-Fase 3 sampai 6 menyusul sesuai bagian 13 PRD.
+Fase 3 selesai: klasifikasi topik multi-label deterministik untuk paper dan skripsi,
+sub-topik dengan fallback "Umum", antrean review dengan navigasi keyboard, override
+manual terkunci, FTS5 untuk pencarian judul, dan skrip evaluasi golden set (micro/macro F1).
+
+Fase 4 sampai 6 menyusul sesuai bagian 13 PRD.

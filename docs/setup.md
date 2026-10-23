@@ -95,8 +95,10 @@ Panel admin ada di http://127.0.0.1:8000/admin. Di dalamnya:
 
 1. **Dosen**: tambah dosen, tempel URL Scholar, lalu petakan ID OpenAlex.
 2. **Taksonomi**: periksa topik, lab, dan kata kunci. Setiap simpan menaikkan versi taksonomi.
-3. **Publikasi**: lihat paper per dosen, buat job sinkronisasi, dan impor ekspor Scholar.
-4. **Duplikat**: periksa judul yang mirip 90 sampai 100 persen pada tahun yang sama.
+3. **Review**: tinjau paper dan skripsi tanpa topik, dengan keyakinan rendah, atau dua topik
+   berdekatan. Pilihan manual dikunci dan tidak ditimpa klasifikasi ulang.
+4. **Publikasi**: lihat paper per dosen, buat job sinkronisasi, dan impor ekspor Scholar.
+5. **Duplikat**: periksa judul yang mirip 90 sampai 100 persen pada tahun yang sama.
 
 ### Menyinkronkan publikasi
 
@@ -123,6 +125,24 @@ Scholar, atau judul. Judul yang mirip 90 sampai 100 persen pada tahun yang sama 
 otomatis, tetapi masuk antrean **Duplikat** untuk diputuskan admin. Abstrak yang kosong dicari
 ke OpenAlex lewat pencocokan judul.
 
+### Review dan klasifikasi ulang
+
+Paper baru langsung diklasifikasi saat sinkronisasi atau impor. Halaman **Review** menampung
+paper dan skripsi yang belum punya topik, keyakinannya di bawah 0,5, atau selisih dua topik
+teratasnya kurang dari 0,1. Pintasan keyboard: `j`/`k` pindah kartu, `1`–`9` pilih topik,
+`x` tandai tidak relevan, `Enter` simpan.
+
+Setelah mengubah kata kunci di halaman **Taksonomi**, tekan **Buat job klasifikasi ulang** lalu
+jalankan:
+
+```powershell
+uv run python -m app.jobs reclassify
+```
+
+Job ini mengklasifikasi ulang paper dan skripsi yang belum ditinjau. Label `locked=true` dan
+keputusan "tidak relevan" tetap dipertahankan. Versi taksonomi ikut dicatat di setiap label.
+Setelah memperbarui dari Fase 2, jalankan sekali agar paper lama ikut berlabel.
+
 Perintah CLI yang tersedia:
 
 ```powershell
@@ -130,6 +150,7 @@ uv run python -m app.cli init-db            # migrasi database
 uv run python -m app.cli hash-password      # hash kata sandi admin
 uv run python -m app.cli import-taxonomy    # impor ulang seeds/taxonomy.yaml
 uv run python -m app.jobs sync              # sinkronisasi publikasi OpenAlex
+uv run python -m app.jobs reclassify        # klasifikasi ulang paper dan skripsi
 ```
 
 ## 5. Tes dan lint
@@ -140,6 +161,18 @@ uv run python -m app.jobs sync              # sinkronisasi publikasi OpenAlex
 
 Isinya: `ruff check .`, `ruff format --check .`, lalu `pytest -q`.
 Tes tidak boleh memanggil jaringan. Data uji ada di `tests/fixtures/`.
+
+Evaluasi classifier memakai golden set berlabel manual (minimal 150 paper sesuai PRD):
+
+```powershell
+Copy-Item seeds\golden_set.example.csv seeds\golden_set.csv
+# isi kolom judul, abstrak, topik (pisahkan topik dengan ;)
+uv run python scripts\evaluate_classifier.py
+```
+
+Skrip mencetak micro precision/recall/F1, macro F1, dan skor per topik. Jalankan setiap
+`taxonomy_version` berubah. Contoh 22 baris hanya untuk memastikan skrip berjalan, bukan
+golden set final.
 
 ## 6. Persiapan data dosen
 

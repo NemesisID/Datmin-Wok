@@ -1,0 +1,23 @@
+judul,abstrak,topik
+"Analisis sentimen ulasan aplikasi transportasi daring menggunakan naive bayes","Klasifikasi teks ulasan twitter dengan data mining.",Data Mining
+"Peramalan penjualan dengan LSTM dan ARIMA","Prediksi time series menggunakan forecasting.",Data Mining
+"Rancang bangun aplikasi web inventaris menggunakan Laravel","Pengembangan aplikasi prototype waterfall.",Rancang Bangun Aplikasi
+"Evaluasi usability aplikasi mobile dengan design thinking dan SUS","User experience dan user interface.",UI/UX
+"Pengujian perangkat lunak dengan black box dan automation testing","Test case menggunakan Selenium.",Testing
+"Manajemen risiko proyek agile dengan scrum","Project management dan PMBOK.",Manajemen Proyek
+"Sistem pendukung keputusan pemilihan supplier dengan AHP dan TOPSIS","Metode decision support SAW.",SPK (Sistem Pendukung Keputusan)
+"Pemodelan system dynamics untuk simulasi kebijakan","Monte Carlo dan discrete event.",Pemodelan & Simulasi
+"Analisis QoS jaringan wireless menggunakan Mikrotik","Routing dan VLAN.",Jaringan
+"Smart home berbasis internet of things dengan ESP32 dan MQTT","Sensor Arduino.",IoT
+"Implementasi ERP Odoo untuk modul inventori","Customisasi SAP.",Customisasi ERP
+"Process mining untuk evaluasi proses bisnis dengan BPMN","Workflow dan SOP.",Manajemen Proses Bisnis
+"Dashboard business intelligence dengan data warehouse dan ETL","Power BI dan OLAP.",Business Intelligence Application
+"Deteksi objek computer vision menggunakan deep learning CNN","Neural network dan artificial intelligence.",AI
+"Perencanaan strategis sistem informasi dengan TOGAF","Enterprise architecture dan roadmap TI.",Perencanaan dan Strategi TI
+"Audit sistem informasi menggunakan COBIT","Tata kelola TI dan maturity level.",Audit dan Tata Kelola TI
+"Evaluasi kesuksesan sistem informasi dengan DeLone McLean","Kepuasan pengguna dan HOT-Fit.",Pengembangan dan Evaluasi Sistem
+"Implementasi ITIL untuk service desk dan SLA","Infrastruktur TI dan cloud.",Operasional TI & Infrastruktur
+"Master data management dan kualitas data","Data governance dan DAMA.",Manajemen Data dan Informasi
+"Adopsi teknologi UTAUT pada transformasi digital","Technology acceptance dan niat penggunaan.",Adopsi Teknologi dan Inovasi
+"Analisis sistem dengan UML dan causal loop","Pemodelan dinamik.",Analisis Sistem dan Pemodelan Dinamik
+"Rancang bangun aplikasi mobile dan evaluasi usability","Flutter dan user experience.",Rancang Bangun Aplikasi;UI/UX

@@ -12,6 +12,7 @@ from sqlmodel import Session, SQLModel
 from app import admin
 from app.config import get_settings
 from app.db import get_session
+from app.fts import ensure_fts
 from app.main import app
 from app.security import hash_password
 
@@ -27,6 +28,7 @@ def engine():
         poolclass=StaticPool,
     )
     SQLModel.metadata.create_all(engine)
+    ensure_fts(engine)
     yield engine
     engine.dispose()
 

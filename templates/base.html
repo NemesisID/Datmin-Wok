@@ -15,6 +15,7 @@
       <a href="/admin">Dasbor</a>
       <a href="/admin/dosen">Dosen</a>
       <a href="/admin/taksonomi">Taksonomi</a>
+      <a href="/admin/review">Review</a>
       <a href="/admin/duplikat">Duplikat</a>
     </nav>
     <form method="post" action="/admin/logout" class="keluar">
@@ -29,5 +30,6 @@
     {% for pesan in flash %}<p class="flash" role="status">{{ pesan }}</p>{% endfor %}
     {% block content %}{% endblock %}
   </main>
+  {% block scripts %}{% endblock %}
 </body>
 </html>
