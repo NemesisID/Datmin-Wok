@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Dasbor · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Dasbor</h1>
+<p class="petunjuk">Versi taksonomi saat ini: <strong>{{ counts.taxonomy_version }}</strong>.
+Setiap perubahan topik atau kata kunci menaikkan versi ini.</p>
+
+<dl class="angka">
+  <div><dt>Dosen</dt><dd>{{ counts.lecturers }}<span class="kecil"> ({{ counts.active_lecturers }} aktif)</span></dd></div>
+  <div><dt>Topik aktif</dt><dd>{{ counts.topics }}</dd></div>
+  <div><dt>Kata kunci</dt><dd>{{ counts.keywords }}</dd></div>
+</dl>
+
+<h2>Langkah berikutnya</h2>
+<ul class="daftar">
+  <li><a href="/admin/dosen">Tambah dosen dan petakan ID OpenAlex</a></li>
+  <li><a href="/admin/taksonomi">Periksa topik dan kata kunci</a></li>
+</ul>
+<p class="petunjuk">Sinkronisasi publikasi dan klasifikasi menyusul di Fase 2 dan Fase 3.</p>
+{% endblock %}

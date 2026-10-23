@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{% if lecturer %}Ubah dosen{% else %}Dosen baru{% endif %} · {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/admin/dosen">Kembali ke daftar dosen</a></p>
+<h1>{% if lecturer %}{{ lecturer.name }}{% else %}Dosen baru{% endif %}</h1>
+
+<form method="post" action="{% if lecturer %}/admin/dosen/{{ lecturer.id }}{% else %}/admin/dosen/baru{% endif %}" class="formulir">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="field">
+    <label for="name">Nama tanpa gelar</label>
+    <input id="name" name="name" value="{{ lecturer.name if lecturer else '' }}" required>
+    <p class="bantuan">Tulis sama seperti di OpenAlex, misalnya <em>Nur Cahyo Wibowo</em>.</p>
+  </div>
+  <div class="field">
+    <label for="title">Gelar</label>
+    <input id="title" name="title" value="{{ lecturer.title if lecturer else '' }}" placeholder="S.Kom., M.Kom.">
+  </div>
+  <div class="field">
+    <label for="scholar">URL atau ID Google Scholar</label>
+    <input id="scholar" name="scholar"
+           value="{{ lecturer.scholar_id if lecturer and lecturer.scholar_id else '' }}"
+           placeholder="https://scholar.google.com/citations?user=XXXXXXXXXXXX">
+    <p class="bantuan">ID diambil dari parameter <code>user=</code>. Boleh dikosongkan.</p>
+  </div>
+  <div class="field">
+    <label for="notes">Catatan</label>
+    <textarea id="notes" name="notes" rows="3">{{ lecturer.notes if lecturer else '' }}</textarea>
+  </div>
+  <div class="field centang">
+    <input type="checkbox" id="active" name="active" value="true"
+           {% if not lecturer or lecturer.active %}checked{% endif %}>
+    <label for="active">Dosen aktif</label>
+  </div>
+  <button type="submit" class="tombol">{% if lecturer %}Simpan perubahan{% else %}Tambah dosen{% endif %}</button>
+</form>
+
+{% if lecturer %}
+<section class="bagian">
+  <h2>ID OpenAlex</h2>
+  <p class="petunjuk">Tambahkan ID penulis OpenAlex yang sudah Anda cocokkan dengan karya dosen ini.
+  Kandidat salah orang akan membuat data publikasi tercampur.</p>
+
+  {% if openalex_ids %}
+  <div class="tabel-scroll">
+    <table>
+      <thead><tr><th>ID</th><th>Nama di OpenAlex</th><th>Karya</th><th>Dikonfirmasi</th><th></th></tr></thead>
+      <tbody>
+        {% for baris in openalex_ids %}
+        <tr>
+          <td><code>{{ baris.openalex_author_id }}</code></td>
+          <td>{{ baris.display_name or "—" }}</td>
+          <td>{{ baris.works_count if baris.works_count is not none else "—" }}</td>
+          <td>{{ baris.confirmed_at.strftime("%Y-%m-%d") }}</td>
+          <td>
+            <form method="post" action="/admin/dosen/{{ lecturer.id }}/openalex/{{ baris.openalex_author_id }}/hapus">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="tautan bahaya">Hapus</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="kosong">Belum ada ID OpenAlex. Dosen ini belum bisa disinkronkan.</p>
+  {% endif %}
+
+  <form method="post" action="/admin/dosen/{{ lecturer.id }}/openalex" class="formulir baris">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field tumbuh">
+      <label for="openalex_author_id">ID OpenAlex</label>
+      <input id="openalex_author_id" name="openalex_author_id" placeholder="A5056916903" required>
+    </div>
+    <button type="submit" class="tombol sekunder">Petakan</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="merek" href="/admin">{{ app_name }}</a>
+    {% if admin %}
+    <nav aria-label="Navigasi admin">
+      <a href="/admin">Dasbor</a>
+      <a href="/admin/dosen">Dosen</a>
+      <a href="/admin/taksonomi">Taksonomi</a>
+    </nav>
+    <form method="post" action="/admin/logout" class="keluar">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="tautan">Keluar</button>
+    </form>
+    {% endif %}
+  </header>
+
+  <main class="wadah">
+    {% if error %}<p class="galat" role="alert">{{ error }}</p>{% endif %}
+    {% for pesan in flash %}<p class="flash" role="status">{{ pesan }}</p>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

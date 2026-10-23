@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Permintaan ditolak · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="sempit">
+  <h1>Permintaan ditolak</h1>
+  <p>Token CSRF tidak valid atau sesi sudah kedaluwarsa. Muat ulang halaman, lalu coba lagi.</p>
+  <p><a class="tombol" href="/admin">Kembali ke dasbor</a></p>
+</div>
+{% endblock %}

@@ -34,9 +34,10 @@ Dari folder proyek:
 Skrip ini, dan aman dijalankan berulang:
 
 1. Memasang dependensi dari `pyproject.toml` ke `.venv`.
-2. Membuat `.env` dari `.env.example` kalau belum ada.
+2. Membuat `.env` dari `.env.example` kalau belum ada, dan mengisi `SECRET_KEY` acak.
 3. Membuat folder `data/` untuk database SQLite.
-4. Memeriksa bahwa paket inti bisa diimpor.
+4. Menjalankan migrasi Alembic.
+5. Mengimpor `seeds/taxonomy.yaml` (idempoten).
 
 Kalau PowerShell menolak menjalankan skrip:
 
@@ -46,7 +47,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 
 ## 3. Mengisi `.env`
 
-Buka `.env` dan sesuaikan. Hanya `OPENALEX_API_KEY` yang perlu diisi kalau Anda punya kuncinya.
+Buka `.env` dan sesuaikan. Bagian yang wajib diisi hanya kata sandi admin.
+`SECRET_KEY` sudah dibuat otomatis oleh skrip setup, tetapi ganti sendiri sebelum deploy.
 
 | Variabel | Arti | Default |
 | --- | --- | --- |
@@ -56,9 +58,24 @@ Buka `.env` dan sesuaikan. Hanya `OPENALEX_API_KEY` yang perlu diisi kalau Anda 
 | `OPENALEX_BASE_URL` | Alamat API | `https://api.openalex.org` |
 | `PUBLICATION_WINDOW_YEARS` | Jendela publikasi yang diambil | `3` |
 | `ENABLE_SCHOLAR_SCRAPER` | Scraper HTML Scholar. Jangan dinyalakan | `false` |
+| `ADMIN_USERNAME` | Nama pengguna admin | `admin` |
+| `ADMIN_PASSWORD_HASH` | Hash kata sandi admin, bukan kata sandi asli | kosong |
+| `SECRET_KEY` | Kunci penanda tangan cookie sesi | dibuat otomatis |
+| `COOKIE_SECURE` | Setel `true` hanya kalau situs memakai HTTPS | `false` |
+| `LOGIN_MAX_ATTEMPTS` | Batas percobaan login per IP | `5` |
+| `LOGIN_WINDOW_SECONDS` | Jendela waktu pembatasan login | `900` |
 | `USE_LLM` | Klasifikasi tahap 3 dengan LLM | `false` |
 
 Tanpa API key aplikasi tetap jalan, tetapi dibatasi sekitar 10 request per detik.
+
+### Membuat kata sandi admin
+
+```powershell
+uv run python -m app.cli hash-password
+```
+
+Masukkan kata sandi dua kali, lalu tempel baris `ADMIN_PASSWORD_HASH=...` yang tercetak ke `.env`.
+Jalankan `.\scripts\setup.ps1` lagi atau restart aplikasi. Kata sandi asli tidak disimpan di mana pun.
 
 ## 4. Menjalankan
 
@@ -72,6 +89,19 @@ Cek kesehatan:
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health
+```
+
+Panel admin ada di http://127.0.0.1:8000/admin. Di dalamnya:
+
+1. **Dosen**: tambah dosen, tempel URL Scholar, lalu petakan ID OpenAlex.
+2. **Taksonomi**: periksa topik, lab, dan kata kunci. Setiap simpan menaikkan versi taksonomi.
+
+Perintah CLI yang tersedia:
+
+```powershell
+uv run python -m app.cli init-db            # migrasi database
+uv run python -m app.cli hash-password      # hash kata sandi admin
+uv run python -m app.cli import-taxonomy    # impor ulang seeds/taxonomy.yaml
 ```
 
 ## 5. Tes dan lint
@@ -139,6 +169,20 @@ Pakai port lain: `.\scripts\dev.ps1 -Port 8001`.
 
 **Dependensi rusak setelah ganti versi Python.**
 Hapus `.venv` lalu jalankan `.\scripts\setup.ps1` lagi. Jangan hapus `uv.lock`.
+
+**Ingin mulai dari database kosong.**
+Hentikan aplikasi, hapus `data/app.db`, `data/app.db-wal`, dan `data/app.db-shm`, lalu jalankan:
+
+```powershell
+uv run python -m app.cli init-db
+uv run python -m app.cli import-taxonomy
+```
+
+Semua dosen dan pemetaan ID OpenAlex ikut terhapus. Taksonomi dikembalikan dari seed.
+
+**Lupa kata sandi admin.**
+Jalankan `uv run python -m app.cli hash-password`, ganti `ADMIN_PASSWORD_HASH` di `.env`, lalu
+restart aplikasi.
 
 **Skrip diblokir kebijakan eksekusi.**
 Jalankan dengan `powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1`.

@@ -1,6 +1,5 @@
 # Lint, cek format, dan tes. Gagal di langkah pertama yang bermasalah.
-
-$ErrorActionPreference = "Stop"
+# Tidak memakai ErrorActionPreference=Stop karena uv menulis progres ke stderr.
 
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root

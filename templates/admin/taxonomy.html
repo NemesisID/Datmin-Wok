@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Taksonomi · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="judul-halaman">
+  <h1>Taksonomi</h1>
+  <a class="tombol" href="/admin/taksonomi/baru">Tambah topik</a>
+</div>
+<p class="petunjuk">Versi taksonomi: <strong>{{ taxonomy_version }}</strong>.
+Topik yang sama tampil di dua lab lewat satu baris data dan satu daftar kata kunci.</p>
+
+{% if rows %}
+<div class="tabel-scroll">
+  <table>
+    <thead>
+      <tr><th>Topik</th><th>Lab</th><th>Kata kunci</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for baris in rows %}
+      <tr class="induk">
+        <td><a href="/admin/taksonomi/{{ baris.topic.id }}">{{ baris.topic.name }}</a></td>
+        <td>
+          {% for lab in baris.labs %}<span class="lencana">{{ lab }}</span>{% endfor %}
+        </td>
+        <td>{{ baris.keywords }}</td>
+        <td>{% if baris.topic.active %}aktif{% else %}<span class="lencana abu">nonaktif</span>{% endif %}</td>
+        <td><a href="/admin/taksonomi/{{ baris.topic.id }}">Ubah</a></td>
+      </tr>
+      {% for anak in baris.children %}
+      <tr class="anak">
+        <td><span class="garis">└</span> <a href="/admin/taksonomi/{{ anak.topic.id }}">{{ anak.topic.name }}</a></td>
+        <td>{% for lab in anak.labs %}<span class="lencana">{{ lab }}</span>{% endfor %}</td>
+        <td>{{ anak.keywords }}</td>
+        <td>{% if anak.topic.active %}aktif{% else %}<span class="lencana abu">nonaktif</span>{% endif %}</td>
+        <td><a href="/admin/taksonomi/{{ anak.topic.id }}">Ubah</a></td>
+      </tr>
+      {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="kosong">Taksonomi belum diimpor. Jalankan
+<code>uv run python -m app.cli import-taxonomy</code>.</p>
+{% endif %}
+{% endblock %}

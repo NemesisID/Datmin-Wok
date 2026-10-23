@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Dosen · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="judul-halaman">
+  <h1>Dosen</h1>
+  <a class="tombol" href="/admin/dosen/baru">Tambah dosen</a>
+</div>
+<p class="petunjuk">Identitas dosen adalah ID OpenAlex yang dikonfirmasi, bukan nama.
+Satu dosen boleh punya lebih dari satu ID.</p>
+
+{% if lecturers %}
+<div class="tabel-scroll">
+  <table>
+    <thead>
+      <tr><th>Nama</th><th>Scholar</th><th>ID OpenAlex</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for dosen in lecturers %}
+      <tr>
+        <td>
+          <a href="/admin/dosen/{{ dosen.id }}">{{ dosen.name }}</a>
+          {% if dosen.title %}<span class="kecil">{{ dosen.title }}</span>{% endif %}
+        </td>
+        <td>{{ dosen.scholar_id or "—" }}</td>
+        <td>{{ openalex_counts.get(dosen.id, 0) }}</td>
+        <td>
+          {% if dosen.active %}<span class="lencana hijau">aktif</span>
+          {% else %}<span class="lencana abu">nonaktif</span>{% endif %}
+        </td>
+        <td><a href="/admin/dosen/{{ dosen.id }}">Ubah</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="kosong">Belum ada dosen. Mulai dengan menambahkan satu dosen, lalu petakan ID OpenAlex-nya.</p>
+{% endif %}
+{% endblock %}

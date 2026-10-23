@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     llm_provider: str = ""
     llm_model: str = ""
 
+    admin_username: str = "admin"
+    admin_password_hash: str = ""
+    secret_key: str = ""
+    cookie_secure: bool = False
+    session_max_age_seconds: int = 8 * 60 * 60
+    login_max_attempts: int = 5
+    login_window_seconds: int = 15 * 60
+
 
 @lru_cache
 def get_settings() -> Settings:

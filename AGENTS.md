@@ -49,7 +49,7 @@ Di Windows, pakai skrip pembungkusnya:
 ## Status fase
 
 - [x] Fase 0: fondasi, spike OpenAlex
-- [ ] Fase 1: skema, taksonomi, admin dasar
+- [x] Fase 1: skema, taksonomi, admin dasar
 - [ ] Fase 2: sinkronisasi publikasi
 - [ ] Fase 3: klasifikasi dan review
 - [ ] Fase 4: upload skripsi

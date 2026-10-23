@@ -8,12 +8,13 @@ Spesifikasi lengkap: `PRD & Rencana Sistem Rekomendasi Dosen Pembimbing Skripsi 
 ## Menjalankan
 
 ```powershell
-.\scripts\setup.ps1     # sekali jalan: dependensi, .env, folder data
+.\scripts\setup.ps1     # dependensi, .env, migrasi, seed taksonomi
+uv run python -m app.cli hash-password   # buat hash kata sandi admin, tempel ke .env
 .\scripts\dev.ps1       # http://127.0.0.1:8000
 ```
 
-Cek kesehatan di `/health`. Panduan lengkap, termasuk isi `.env` dan persiapan data dosen,
-ada di `docs/setup.md`.
+Panel admin: http://127.0.0.1:8000/admin. Cek kesehatan di `/health`.
+Panduan lengkap, termasuk isi `.env` dan persiapan data dosen, ada di `docs/setup.md`.
 
 ## Tes dan lint
 
@@ -35,4 +36,9 @@ Tanpa API key tetap jalan dengan batas 10 request per detik.
 ## Status
 
 Fase 0 selesai: kerangka aplikasi, konfigurasi, klien OpenAlex, dan hasil spike.
-Halaman publik, klasifikasi, dan unggah skripsi menyusul sesuai bagian 13 PRD.
+
+Fase 1 selesai: skema 17 tabel dengan Alembic, seed taksonomi 23 topik dan 166 kata kunci,
+login admin dengan CSRF dan pembatas percobaan, CRUD dosen, pemetaan ID OpenAlex,
+editor taksonomi dengan `taxonomy_version`.
+
+Fase 2 sampai 6 menyusul sesuai bagian 13 PRD.

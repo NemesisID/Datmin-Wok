@@ -1,0 +1,283 @@
+# Seed taksonomi Prodi Sistem Informasi UPN Veteran Jawa Timur.
+# Satu topik = satu baris. Lab disimpan di relasi, bukan di nama.
+# Impor: uv run python -m app.cli import-taxonomy
+
+topics:
+  - name: Rancang Bangun Aplikasi
+    labs: [SOLUSI]
+    sort_order: 10
+    keywords:
+      - rancang bangun
+      - aplikasi web
+      - aplikasi mobile
+      - sistem informasi
+      - pengembangan aplikasi
+      - prototype
+      - waterfall
+      - Laravel
+      - Flutter
+
+  - name: Data Mining
+    labs: [SOLUSI]
+    sort_order: 20
+    keywords:
+      - data mining
+      - klasifikasi
+      - clustering
+      - naive bayes
+      - k-means
+      - random forest
+      - association rule
+    subtopics:
+      - name: Analisis Sentimen
+        labs: [SOLUSI]
+        sort_order: 21
+        keywords:
+          - analisis sentimen
+          - sentiment analysis
+          - opinion mining
+          - ulasan
+          - twitter
+      - name: Forecasting
+        labs: [SOLUSI]
+        sort_order: 22
+        keywords:
+          - peramalan
+          - forecasting
+          - prediksi
+          - time series
+          - ARIMA
+          - LSTM
+      - name: Umum
+        labs: [SOLUSI]
+        sort_order: 23
+        keywords: []
+
+  - name: UI/UX
+    labs: [SOLUSI, MSI]
+    sort_order: 30
+    keywords:
+      - user interface
+      - user experience
+      - usability
+      - SUS
+      - design thinking
+      - Figma
+      - heuristic evaluation
+      - pengalaman pengguna
+
+  - name: Testing
+    labs: [SOLUSI]
+    sort_order: 40
+    keywords:
+      - software testing
+      - pengujian perangkat lunak
+      - black box
+      - white box
+      - UAT
+      - test case
+      - automation testing
+      - Selenium
+
+  - name: Manajemen Proyek
+    labs: [SOLUSI, MSI]
+    sort_order: 50
+    keywords:
+      - manajemen proyek
+      - project management
+      - PMBOK
+      - scrum
+      - agile
+      - manajemen risiko
+      - estimasi usaha
+      - IT project
+      - risiko proyek
+
+  - name: SPK (Sistem Pendukung Keputusan)
+    labs: [SOLUSI]
+    sort_order: 60
+    keywords:
+      - sistem pendukung keputusan
+      - decision support
+      - AHP
+      - TOPSIS
+      - SAW
+      - PROMETHEE
+      - VIKOR
+      - MOORA
+
+  - name: Pemodelan & Simulasi
+    labs: [SOLUSI]
+    sort_order: 70
+    keywords:
+      - simulasi
+      - system dynamics
+      - agent-based
+      - discrete event
+      - Monte Carlo
+      - pemodelan
+      - Arena
+      - AnyLogic
+      - Vensim
+
+  - name: Jaringan
+    labs: [SOLUSI]
+    sort_order: 80
+    keywords:
+      - jaringan komputer
+      - computer network
+      - QoS
+      - routing
+      - SDN
+      - wireless
+      - VLAN
+      - Mikrotik
+      - keamanan jaringan
+
+  - name: IoT
+    labs: [SOLUSI]
+    sort_order: 90
+    keywords:
+      - internet of things
+      - IoT
+      - sensor
+      - Arduino
+      - ESP32
+      - Raspberry Pi
+      - smart home
+      - MQTT
+
+  - name: Customisasi ERP
+    labs: [SOLUSI]
+    sort_order: 100
+    keywords:
+      - ERP
+      - Odoo
+      - SAP
+      - customisasi
+      - modul ERP
+      - implementasi ERP
+
+  - name: Manajemen Proses Bisnis
+    labs: [SOLUSI]
+    sort_order: 110
+    keywords:
+      - proses bisnis
+      - BPMN
+      - business process
+      - process mining
+      - BPR
+      - SOP
+      - workflow
+
+  - name: Business Intelligence Application
+    labs: [SOLUSI]
+    sort_order: 120
+    keywords:
+      - business intelligence
+      - dashboard
+      - data warehouse
+      - ETL
+      - OLAP
+      - Power BI
+      - Tableau
+
+  - name: AI
+    labs: [SOLUSI]
+    sort_order: 130
+    keywords:
+      - kecerdasan buatan
+      - artificial intelligence
+      - deep learning
+      - neural network
+      - CNN
+      - NLP
+      - computer vision
+      - chatbot
+      - LLM
+
+  - name: Perencanaan dan Strategi TI
+    labs: [MSI]
+    sort_order: 200
+    keywords:
+      - perencanaan strategis sistem informasi
+      - ISSP
+      - enterprise architecture
+      - TOGAF
+      - Zachman
+      - roadmap TI
+      - blueprint
+
+  - name: Audit dan Tata Kelola TI
+    labs: [MSI]
+    sort_order: 210
+    keywords:
+      - audit sistem informasi
+      - COBIT
+      - tata kelola TI
+      - IT governance
+      - ISO 27001
+      - risk assessment
+      - capability level
+      - maturity level
+
+  - name: Pengembangan dan Evaluasi Sistem
+    labs: [MSI]
+    sort_order: 220
+    keywords:
+      - evaluasi sistem informasi
+      - SDLC
+      - DeLone McLean
+      - kesuksesan sistem
+      - kepuasan pengguna
+      - HOT-Fit
+      - EUCS
+
+  - name: Operasional TI & Infrastruktur
+    labs: [MSI]
+    sort_order: 230
+    keywords:
+      - ITIL
+      - ITSM
+      - service desk
+      - infrastruktur TI
+      - data center
+      - cloud
+      - SLA
+
+  - name: Manajemen Data dan Informasi
+    labs: [MSI]
+    sort_order: 240
+    keywords:
+      - manajemen data
+      - data governance
+      - DAMA
+      - kualitas data
+      - master data
+      - keamanan informasi
+      - knowledge management
+
+  - name: Adopsi Teknologi dan Inovasi
+    labs: [MSI]
+    sort_order: 250
+    keywords:
+      - TAM
+      - UTAUT
+      - technology acceptance
+      - adopsi teknologi
+      - niat penggunaan
+      - diffusion of innovation
+      - TOE
+      - transformasi digital
+
+  - name: Analisis Sistem dan Pemodelan Dinamik
+    labs: [MSI]
+    sort_order: 260
+    keywords:
+      - system dynamics
+      - pemodelan dinamik
+      - causal loop
+      - stock and flow
+      - UML
+      - analisis sistem
+      - simulasi dinamik
