@@ -1,0 +1,113 @@
+{# Komponen kecil yang dipakai bersama halaman publik. #}
+{% macro label_badge(label) -%}
+  {% set kind = "kuat" if label == "Kuat" else ("cukup" if label == "Cukup" else ("lemah" if label == "Lemah" else "abu")) %}
+  <span class="label-bukti {{ kind }}">{{ label }}</span>
+{%- endmacro %}
+
+{% macro topic_badge(topic) -%}
+  <span class="topik-chip">
+    {{ topic.name }}
+    {% if topic.labs %}<span class="lab-chip">{{ topic.labs|join(" / ") }}</span>{% endif %}
+  </span>
+{%- endmacro %}
+
+{% macro paper_link(paper) -%}
+  {% if paper.doi and paper.doi.startswith("http") %}
+    <a href="{{ paper.doi }}" rel="noopener">{{ paper.title }}</a>
+  {% elif paper.doi %}
+    <a href="https://doi.org/{{ paper.doi }}" rel="noopener">{{ paper.title }}</a>
+  {% else %}
+    {{ paper.title }}
+  {% endif %}
+{%- endmacro %}
+
+{% macro paper_item(item) -%}
+  <li class="eviden">
+    <div class="eviden-judul">
+      {{ paper_link(item.paper) }}
+      {% if item.direct %}<span class="lencana hijau">cocok judul</span>{% endif %}
+    </div>
+    <div class="eviden-meta">
+      {{ item.paper.year or "tahun tidak diketahui" }}
+      {% if item.paper.venue %}· {{ item.paper.venue }}{% endif %}
+    </div>
+    {% if item.topics %}
+    <div class="topik-baris">
+      {% for topic in item.topics %}{{ topic_badge(topic) }}{% endfor %}
+    </div>
+    {% endif %}
+  </li>
+{%- endmacro %}
+
+{% macro thesis_item(item) -%}
+  <li class="eviden">
+    <div class="eviden-judul">{{ item.thesis.title }}</div>
+    <div class="eviden-meta">{{ item.thesis.year or "tahun tidak diketahui" }}</div>
+    {% if item.topics %}
+    <div class="topik-baris">
+      {% for topic in item.topics %}{{ topic_badge(topic) }}{% endfor %}
+    </div>
+    {% endif %}
+  </li>
+{%- endmacro %}
+
+{% macro lecturer_card(item, compare=False) -%}
+  <article class="kartu-hasil{% if not item.has_data %} tanpa-data{% endif %}">
+    <div class="hasil-kepala">
+      <div>
+        {% if item.rank %}<span class="peringkat">Peringkat {{ item.rank }}</span>{% endif %}
+        <h3><a href="/dosen/{{ item.lecturer.id }}">{{ item.lecturer.name }}</a></h3>
+        {% if item.lecturer.title %}<p class="kecil">{{ item.lecturer.title }}</p>{% endif %}
+      </div>
+      {{ label_badge(item.label) }}
+    </div>
+
+    {% if item.has_data %}
+      {% if item.topics %}
+      <div class="topik-baris" aria-label="Topik utama">
+        {% for score in item.topics %}{{ topic_badge(score.topic) }}{% endfor %}
+      </div>
+      {% else %}
+      <p class="kecil">Belum ada topik yang terkait.</p>
+      {% endif %}
+      <p class="kecil">{{ item.evidence_count }} bukti relevan.</p>
+      <p><a class="tautan" href="/dosen/{{ item.lecturer.id }}">Lihat profil dan bukti</a></p>
+
+      {% if item.papers %}
+      <h4>Paper</h4>
+      <ul class="daftar-eviden">
+        {% for paper in item.papers %}{{ paper_item(paper) }}{% endfor %}
+      </ul>
+      {% endif %}
+      {% if item.theses %}
+      <h4>Skripsi yang dibimbing</h4>
+      <ul class="daftar-eviden">
+        {% for thesis in item.theses %}{{ thesis_item(thesis) }}{% endfor %}
+      </ul>
+      {% endif %}
+    {% else %}
+      <p class="kecil">Belum ada data publikasi atau bimbingan untuk dosen ini.</p>
+    {% endif %}
+
+    {% if compare %}
+    <label class="pilihan banding-pilihan">
+      <input type="checkbox" name="dosen" value="{{ item.lecturer.id }}">
+      Bandingkan
+    </label>
+    {% endif %}
+  </article>
+{%- endmacro %}
+
+{% macro freshness(latest_sync, stale, stale_days=90) -%}
+  {% if latest_sync %}
+    <p class="kecil">Data terakhir diperbarui {{ latest_sync.strftime("%d-%m-%Y") }}.</p>
+    {% if stale %}
+    <p class="peringatan" role="status">
+      Data terakhir lebih dari {{ stale_days }} hari lalu. Tanyakan ke admin apakah sinkronisasi
+      perlu dijalankan.
+    </p>
+    {% endif %}
+  {% else %}
+    <p class="peringatan" role="status">Belum ada sinkronisasi publikasi.</p>
+  {% endif %}
+{%- endmacro %}

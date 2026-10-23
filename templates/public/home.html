@@ -1,0 +1,111 @@
+{% extends "public/base.html" %}
+{% from "public/_macros.html" import lecturer_card, label_badge, freshness %}
+
+{% block title %}Cari dosen pembimbing · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="pengantar">
+  <h1>Cari dosen pembimbing skripsi</h1>
+  <p class="petunjuk">
+    Pilih topik atau masukkan kata kunci dari draf judul. Hasil diurutkan berdasarkan bukti
+    publikasi dan bimbingan, bukan penilaian kinerja dosen.
+  </p>
+</section>
+
+{% include "public/_search_form.html" %}
+
+{% if result.no_data_state %}
+<section class="kosong" aria-labelledby="belum-data">
+  <h2 id="belum-data">Belum ada data</h2>
+  <p>Admin belum menyinkronkan publikasi dan belum mengunggah data skripsi. Coba lagi setelah
+    data diisi.</p>
+</section>
+{% elif result.has_criteria %}
+<section class="bagian-hasil" aria-labelledby="hasil">
+  <div class="judul-bagian">
+    <div>
+      <h2 id="hasil">Hasil pencarian</h2>
+      <p class="kecil">{{ result.results|length }} dosen dengan bukti yang cocok.</p>
+    </div>
+    {{ freshness(result.latest_sync, result.stale, result.stale_days) }}
+  </div>
+
+  {% if result.query_topics %}
+  <p class="kecil">Topik yang terbaca dari kata kunci:
+    {% for topic in result.query_topics %}
+      <span class="topik-chip">{{ topic.name }}</span>
+    {% endfor %}
+  </p>
+  {% endif %}
+
+  {% if result.results %}
+  <form method="get" action="/bandingkan" data-banding data-max="{{ max_compare }}"
+        aria-label="Bandingkan dosen">
+    <div class="hasil-grid">
+      {% for item in result.results %}
+      {{ lecturer_card(item, compare=True) }}
+      {% endfor %}
+    </div>
+    <div class="aksi-banding">
+      <p class="kecil">Pilih maksimal {{ max_compare }} dosen untuk dibandingkan.</p>
+      <button type="submit" class="tombol sekunder">Bandingkan yang dipilih</button>
+      <p class="kecil" data-banding-hitung aria-live="polite"></p>
+    </div>
+  </form>
+  {% else %}
+  <p class="kosong">Tidak ada dosen yang cocok dengan filter ini. Longgarkan topik, tahun, atau
+    kata kunci.</p>
+  {% endif %}
+
+  {% if result.no_data %}
+  <section class="bagian" aria-labelledby="tanpa-data">
+    <h2 id="tanpa-data">Belum ada data</h2>
+    <p class="kecil">Dosen berikut belum punya bukti publikasi atau bimbingan di database.</p>
+    <ul class="daftar-dosen">
+      {% for item in result.no_data %}
+      <li>
+        <a href="/dosen/{{ item.lecturer.id }}">{{ item.lecturer.name }}</a>
+        {{ label_badge("Belum ada data") }}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</section>
+{% else %}
+<section class="bagian" aria-labelledby="daftar-dosen">
+  <div class="judul-bagian">
+    <div>
+      <h2 id="daftar-dosen">Daftar dosen</h2>
+      <p class="kecil">Pilih topik atau masukkan kata kunci untuk melihat rekomendasi berperingkat.</p>
+    </div>
+    {{ freshness(result.latest_sync, result.stale, result.stale_days) }}
+  </div>
+
+  {% set daftar = result.all_lecturers|selectattr("has_data")|list %}
+  {% if daftar %}
+  <div class="daftar-dosen-grid">
+    {% for item in daftar %}
+    {{ lecturer_card(item) }}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="kosong">Tidak ada dosen dengan bukti di filter ini. Longgarkan filter lab atau tahun.</p>
+  {% endif %}
+
+  {% if result.no_data %}
+  <section class="bagian" aria-labelledby="tanpa-data-browse">
+    <h2 id="tanpa-data-browse">Belum ada data</h2>
+    <ul class="daftar-dosen">
+      {% for item in result.no_data %}
+      <li>
+        <a href="/dosen/{{ item.lecturer.id }}">{{ item.lecturer.name }}</a>
+        {{ label_badge("Belum ada data") }}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

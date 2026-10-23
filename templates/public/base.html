@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/admin.css">
+  <link rel="stylesheet" href="/static/public.css">
+</head>
+<body class="publik">
+  <header class="topbar publik-topbar">
+    <a class="merek" href="/">{{ app_name }}</a>
+    <nav aria-label="Navigasi publik">
+      <a href="/">Cari</a>
+      <a href="/dosen">Dosen</a>
+      <a href="/topik">Topik</a>
+    </nav>
+    {% if admin %}
+    <a class="tautan admin-publik" href="/admin">Panel admin</a>
+    {% endif %}
+  </header>
+
+  <main class="wadah publik-wadah">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="kaki-publik">
+    <p>Rekomendasi berdasarkan bukti publikasi dan riwayat bimbingan, bukan penilaian kinerja.</p>
+  </footer>
+  {% block scripts %}{% endblock %}
+  <script src="/static/public.js" defer></script>
+</body>
+</html>

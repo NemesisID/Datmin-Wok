@@ -1,0 +1,71 @@
+<form method="get" action="/" class="form-cari" role="search" aria-label="Cari dosen pembimbing">
+  <div class="field tumbuh">
+    <label for="q">Kata kunci atau draf judul</label>
+    <input id="q" name="q" type="search" value="{{ filters.query }}"
+           placeholder="misalnya analisis sentimen ulasan aplikasi" maxlength="200">
+    <p class="bantuan" id="q-bantuan">Cocokkan judul paper dan topik yang relevan.</p>
+  </div>
+
+  <fieldset class="field filter-lab">
+    <legend>Lab</legend>
+    <label class="pilihan">
+      <input type="radio" name="lab" value="" {% if not filters.lab %}checked{% endif %}>
+      Semua
+    </label>
+    {% for lab in options.labs %}
+    <label class="pilihan">
+      <input type="radio" name="lab" value="{{ lab }}" {% if filters.lab == lab %}checked{% endif %}>
+      {{ lab }}
+    </label>
+    {% endfor %}
+  </fieldset>
+
+  <fieldset class="field filter-topik">
+    <legend>Topik <span class="kecil">boleh lebih dari satu</span></legend>
+    <div class="pilihan-banyak">
+      {% for topic in options.roots %}
+      <label class="pilihan">
+        <input type="checkbox" name="topik" value="{{ topic.id }}"
+               {% if topic.id in filters.topic_ids %}checked{% endif %}>
+        {{ topic.name }}
+        <span class="kecil">{{ topic.labs|join(" / ") }}</span>
+      </label>
+      {% else %}
+      <p class="kecil">Belum ada topik aktif.</p>
+      {% endfor %}
+    </div>
+  </fieldset>
+
+  <fieldset class="field filter-subtopik">
+    <legend>Sub-topik</legend>
+    <div class="pilihan-banyak">
+      {% for topic in options.subtopics %}
+      <label class="pilihan">
+        <input type="checkbox" name="subtopik" value="{{ topic.id }}"
+               {% if topic.id in filters.subtopic_ids %}checked{% endif %}>
+        {{ topic.name }}
+      </label>
+      {% else %}
+      <p class="kecil">Belum ada sub-topik aktif.</p>
+      {% endfor %}
+    </div>
+  </fieldset>
+
+  <div class="filter-tahun">
+    <div class="field pendek">
+      <label for="tahun_dari">Tahun paper dari</label>
+      <input id="tahun_dari" name="tahun_dari" type="number" min="1900" max="{{ current_year + 1 }}"
+             value="{{ filters.year_from or '' }}" inputmode="numeric">
+    </div>
+    <div class="field pendek">
+      <label for="tahun_sampai">Sampai</label>
+      <input id="tahun_sampai" name="tahun_sampai" type="number" min="1900" max="{{ current_year + 1 }}"
+             value="{{ filters.year_to or '' }}" inputmode="numeric">
+    </div>
+  </div>
+
+  <div class="aksi-cari">
+    <button type="submit" class="tombol">Cari pembimbing</button>
+    <a class="tautan" href="/">Bersihkan filter</a>
+  </div>
+</form>

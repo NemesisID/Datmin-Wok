@@ -13,8 +13,18 @@ uv run python -m app.cli hash-password   # buat hash kata sandi admin, tempel ke
 .\scripts\dev.ps1       # http://127.0.0.1:8000
 ```
 
-Panel admin: http://127.0.0.1:8000/admin. Cek kesehatan di `/health`.
-Panduan lengkap, termasuk isi `.env` dan persiapan data dosen, ada di `docs/setup.md`.
+Halaman publik: http://127.0.0.1:8000. Panel admin: http://127.0.0.1:8000/admin.
+Cek kesehatan di `/health`. Panduan lengkap, termasuk isi `.env` dan persiapan data dosen, ada di
+`docs/setup.md`. Panduan container, HTTPS, dan backup ada di `docs/deploy.md`.
+
+Backup manual:
+
+```powershell
+uv run python -m app.cli backup
+```
+
+Hasilnya ada di `data/backups/harian` dan `data/backups/bulanan`, dengan retensi default 7
+harian dan 1 bulanan.
 
 ## Tes dan lint
 
@@ -53,4 +63,8 @@ Fase 4 selesai: impor skripsi lama dari CSV/XLSX lewat pemetaan kolom dan pratin
 deteksi duplikat berbasis judul/tahun/NIM/kemiripan dengan blok pembimbing, pemetaan alias
 pembimbing, konfirmasi atomik, rollback batch, dan pembersihan pratinjau kedaluwarsa.
 
-Fase 5 sampai 6 menyusul sesuai bagian 13 PRD.
+Fase 5 selesai: halaman publik cari/filter, FTS5 dan klasifikasi query, profil dosen, jelajah
+topik, perbandingan tiga dosen, skor shrinkage saat query dengan label kekuatan bukti, empat
+state, layout responsif, Docker Compose, serta backup SQLite harian/bulanan.
+
+Fase 6 menyusul sesuai bagian 13 PRD.

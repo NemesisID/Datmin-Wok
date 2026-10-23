@@ -1,0 +1,12 @@
+{% extends "public/base.html" %}
+
+{% block title %}Terjadi kesalahan · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="kosong halaman-galat" aria-labelledby="judul-galat">
+  <p class="kode-galat">{{ status_code }}</p>
+  <h1 id="judul-galat">Terjadi kesalahan</h1>
+  <p>{{ error }}</p>
+  <p><a class="tombol" href="/">Kembali ke pencarian</a></p>
+</section>
+{% endblock %}

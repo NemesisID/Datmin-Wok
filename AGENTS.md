@@ -14,6 +14,7 @@ uv run uvicorn app.main:app --reload   # jalankan aplikasi
 uv run pytest                # tes
 uv run ruff check .          # lint
 uv run ruff format .         # format
+uv run python -m app.cli backup  # backup SQLite harian/bulanan
 uv run python scripts/spike_openalex.py  # spike API OpenAlex
 ```
 
@@ -53,7 +54,7 @@ Di Windows, pakai skrip pembungkusnya:
 - [x] Fase 2: sinkronisasi publikasi
 - [x] Fase 3: klasifikasi dan review
 - [x] Fase 4: upload skripsi
-- [ ] Fase 5: halaman publik, skor, deploy
+- [x] Fase 5: halaman publik, skor, deploy
 - [ ] Fase 6: LLM opsional dan poles
 
 Mulai setiap fase dengan rencana singkat, lalu tunggu persetujuan. Akhiri setiap fase dengan tes, ringkasan, dan berhenti.

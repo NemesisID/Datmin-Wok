@@ -11,11 +11,17 @@ class Settings(BaseSettings):
 
     app_name: str = "Rekomendasi Pembimbing Skripsi"
     database_path: Path = Path("data/app.db")
+    backup_dir: Path = Path("data/backups")
+    backup_daily_keep: int = 7
+    backup_monthly_keep: int = 1
 
     openalex_api_key: str = ""
     openalex_base_url: str = "https://api.openalex.org"
 
     publication_window_years: int = 3
+    recency_half_life_years: float = 2.0
+    thesis_lambda: float = 1.5
+    stale_days: int = 90
 
     enable_scholar_scraper: bool = False
 

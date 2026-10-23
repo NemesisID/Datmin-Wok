@@ -1,0 +1,51 @@
+{% extends "public/base.html" %}
+{% from "public/_macros.html" import label_badge, paper_item, thesis_item, topic_badge %}
+
+{% block title %}Bandingkan dosen · {{ app_name }}{% endblock %}
+
+{% block content %}
+<p class="jejak"><a href="/">Pencarian</a> / Bandingkan dosen</p>
+<h1>Bandingkan dosen</h1>
+<p class="petunjuk">Bukti ditampilkan berdampingan agar bisa dibaca langsung. Tidak ada skor
+  penilaian kinerja di halaman ini.</p>
+
+{% if profiles|length < 2 %}
+<p class="kosong">Pilih minimal dua dosen dari hasil pencarian untuk dibandingkan.</p>
+{% endif %}
+
+<div class="banding-grid">
+  {% for profile in profiles %}
+  <article class="kartu-banding">
+    <h2><a href="/dosen/{{ profile.lecturer.id }}">{{ profile.lecturer.name }}</a></h2>
+    {% if not profile.has_data %}
+    {{ label_badge("Belum ada data") }}
+    <p class="kecil">Belum ada publikasi atau bimbingan tersimpan.</p>
+    {% else %}
+    <div class="topik-baris">
+      {% for score in profile.top_topics %}{{ topic_badge(score.topic) }}{% endfor %}
+    </div>
+
+    <h3>Paper</h3>
+    {% if profile.papers %}
+    <ul class="daftar-eviden">
+      {% for item in profile.papers[:5] %}{{ paper_item(item) }}{% endfor %}
+    </ul>
+    {% else %}
+    <p class="kecil">Belum ada paper.</p>
+    {% endif %}
+
+    <h3>Skripsi yang dibimbing</h3>
+    {% if profile.theses %}
+    <ul class="daftar-eviden">
+      {% for item in profile.theses[:3] %}{{ thesis_item(item) }}{% endfor %}
+    </ul>
+    {% else %}
+    <p class="kecil">Belum ada data skripsi.</p>
+    {% endif %}
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+
+<p class="bagian"><a class="tombol sekunder" href="/">Kembali ke pencarian</a></p>
+{% endblock %}

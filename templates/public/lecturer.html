@@ -1,0 +1,138 @@
+{% extends "public/base.html" %}
+{% from "public/_macros.html" import label_badge, paper_item, thesis_item, topic_badge %}
+
+{% block title %}{{ profile.lecturer.name }} · {{ app_name }}{% endblock %}
+
+{% block content %}
+<p class="jejak"><a href="/dosen">Daftar dosen</a> / {{ profile.lecturer.name }}</p>
+
+<header class="profil-kepala">
+  <div>
+    <h1>{{ profile.lecturer.name }}</h1>
+    {% if profile.lecturer.title %}<p class="petunjuk">{{ profile.lecturer.title }}</p>{% endif %}
+  </div>
+  <div class="profil-tautan">
+    {% if profile.scholar_url %}
+    <a class="tombol sekunder" href="{{ profile.scholar_url }}" rel="noopener">Profil Scholar</a>
+    {% endif %}
+    {% for account in profile.openalex_ids %}
+    <a class="tombol sekunder"
+       href="https://openalex.org/{{ account.openalex_author_id }}" rel="noopener">
+      OpenAlex {{ account.openalex_author_id }}
+    </a>
+    {% endfor %}
+  </div>
+</header>
+
+{% if not profile.has_data %}
+<section class="kosong" aria-labelledby="belum-data">
+  <h2 id="belum-data">Belum ada data</h2>
+  <p>Dosen ini belum punya publikasi tersinkron atau riwayat bimbingan di database.</p>
+</section>
+{% else %}
+<div class="profil-grid">
+  <div class="profil-utama">
+    <section aria-labelledby="topik-profil">
+      <h2 id="topik-profil">Distribusi topik</h2>
+      <p class="kecil">Topik dihitung dari paper dan skripsi yang pernah dibimbing.</p>
+      {% for lab, items in profile.topics_by_lab.items() %}
+      <div class="kelompok-lab">
+        <h3>{{ lab }}</h3>
+        {% if items %}
+        <ul class="daftar-topik">
+          {% for score in items %}
+          <li>
+            {{ topic_badge(score.topic) }}
+            {{ label_badge(score.label) }}
+            <span class="kecil">{{ score.paper_count }} paper · {{ score.thesis_count }} skripsi</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="kecil">Belum ada bukti di lab ini.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </section>
+
+    <section class="bagian" aria-labelledby="paper-profil">
+      <div class="judul-bagian">
+        <h2 id="paper-profil">Paper</h2>
+        <p class="kecil">{{ profile.paper_count }} paper tersimpan.</p>
+      </div>
+
+      <form method="get" action="/dosen/{{ profile.lecturer.id }}" class="form-filter"
+            aria-label="Filter paper dosen">
+        <div class="field">
+          <label for="topik-paper">Topik</label>
+          <select id="topik-paper" name="topik">
+            <option value="">Semua topik</option>
+            {% for topic in options.roots %}
+            <option value="{{ topic.id }}" {% if selected_topic == topic.id %}selected{% endif %}>
+              {{ topic.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field pendek">
+          <label for="tahun-dari-paper">Tahun dari</label>
+          <input id="tahun-dari-paper" name="tahun_dari" type="number" min="1900"
+                 max="{{ current_year + 1 }}" value="{{ year_from or '' }}">
+        </div>
+        <div class="field pendek">
+          <label for="tahun-sampai-paper">Sampai</label>
+          <input id="tahun-sampai-paper" name="tahun_sampai" type="number" min="1900"
+                 max="{{ current_year + 1 }}" value="{{ year_to or '' }}">
+        </div>
+        <button type="submit" class="tombol sekunder">Terapkan</button>
+        {% if selected_topic or year_from or year_to %}
+        <a class="tautan" href="/dosen/{{ profile.lecturer.id }}">Bersihkan</a>
+        {% endif %}
+      </form>
+
+      {% if profile.papers %}
+      <ul class="daftar-eviden daftar-paper">
+        {% for item in profile.papers %}{{ paper_item(item) }}{% endfor %}
+      </ul>
+      {% else %}
+      <p class="kosong">Tidak ada paper yang cocok dengan filter ini.</p>
+      {% endif %}
+    </section>
+
+    <section class="bagian" aria-labelledby="skripsi-profil">
+      <div class="judul-bagian">
+        <h2 id="skripsi-profil">Skripsi yang dibimbing</h2>
+        <p class="kecil">{{ profile.thesis_count }} skripsi tersimpan.</p>
+      </div>
+      {% if profile.theses %}
+      <ul class="daftar-eviden">
+        {% for item in profile.theses %}{{ thesis_item(item) }}{% endfor %}
+      </ul>
+      {% else %}
+      <p class="kosong">Belum ada data skripsi yang dibimbing.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="profil-samping" aria-labelledby="data-profil">
+    <h2 id="data-profil">Tentang data</h2>
+    <p>Publikasi yang diambil adalah {{ profile.coverage_years }} tahun terakhir.</p>
+    <p>Skripsi tidak dibatasi jendela {{ profile.coverage_years }} tahun karena riwayat bimbingan
+      tetap relevan.</p>
+    {% if profile.last_synced_at %}
+    <p class="kecil">Sinkronisasi terakhir:
+      {{ profile.last_synced_at.strftime("%d-%m-%Y %H:%M") }}.</p>
+    {% else %}
+    <p class="peringatan" role="status">Belum ada sinkronisasi publikasi.</p>
+    {% endif %}
+    {% if profile.stale %}
+    <p class="peringatan" role="status">
+      Data terakhir lebih dari {{ profile.stale_days }} hari lalu. Tanyakan ke admin apakah
+      sinkronisasi perlu dijalankan.
+    </p>
+    {% endif %}
+    <p class="kecil">Yang terlihat adalah peringkat, label kekuatan bukti, dan daftar bukti.</p>
+  </aside>
+</div>
+{% endif %}
+{% endblock %}

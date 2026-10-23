@@ -5,6 +5,7 @@ __pycache__/
 .ruff_cache/
 .env
 data/
+backups/
 *.db
 *.db-wal
 *.db-shm

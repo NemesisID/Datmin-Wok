@@ -57,6 +57,12 @@ Buka `.env` dan sesuaikan. Bagian yang wajib diisi hanya kata sandi admin.
 | `OPENALEX_API_KEY` | Kunci API OpenAlex. Dikirim lewat header `Authorization: Bearer` | kosong |
 | `OPENALEX_BASE_URL` | Alamat API | `https://api.openalex.org` |
 | `PUBLICATION_WINDOW_YEARS` | Jendela publikasi yang diambil | `3` |
+| `RECENCY_HALF_LIFE_YEARS` | Half-life bobot recency paper | `2` |
+| `THESIS_LAMBDA` | Bobot bukti skripsi terhadap paper | `1.5` |
+| `STALE_DAYS` | Umur data sebelum ditandai usang | `90` |
+| `BACKUP_DIR` | Folder backup SQLite | `data/backups` |
+| `BACKUP_DAILY_KEEP` | Jumlah backup harian yang disimpan | `7` |
+| `BACKUP_MONTHLY_KEEP` | Jumlah backup bulanan yang disimpan | `1` |
 | `ENABLE_SCHOLAR_SCRAPER` | Scraper HTML Scholar. Jangan dinyalakan | `false` |
 | `ADMIN_USERNAME` | Nama pengguna admin | `admin` |
 | `ADMIN_PASSWORD_HASH` | Hash kata sandi admin, bukan kata sandi asli | kosong |
@@ -100,6 +106,33 @@ Panel admin ada di http://127.0.0.1:8000/admin. Di dalamnya:
 4. **Publikasi**: lihat paper per dosen, buat job sinkronisasi, dan impor ekspor Scholar.
 5. **Skripsi**: unggah data skripsi lama lewat pratinjau, petakan pembimbing, lalu konfirmasi.
 6. **Duplikat**: periksa judul yang mirip 90 sampai 100 persen pada tahun yang sama.
+
+### Halaman publik
+
+Halaman publik tidak memerlukan login:
+
+- `/` untuk mencari dengan kata kunci, lab, beberapa topik, sub-topik, dan rentang tahun paper.
+- `/dosen` untuk daftar dosen dan topik utama.
+- `/dosen/{id}` untuk profil, sebaran topik per lab, paper, dan skripsi yang dibimbing.
+- `/topik` untuk melihat dosen teratas di setiap topik.
+- `/bandingkan?dosen=1&dosen=2` untuk membandingkan maksimal tiga dosen.
+
+Nama mahasiswa dan NIM tidak pernah dikirim ke halaman publik. Hasil rekomendasi memakai
+peringkat, label kekuatan bukti (`Lemah`, `Cukup`, `Kuat`), dan daftar bukti, tanpa angka skor.
+Dosen yang belum punya bukti masuk grup "belum ada data" di bagian bawah.
+
+### Backup database
+
+Backup memakai `VACUUM INTO`, bukan menyalin file database yang sedang dipakai:
+
+```powershell
+uv run python -m app.cli backup
+```
+
+Hasilnya ada di `data/backups/harian/app-YYYY-MM-DD.db` dan
+`data/backups/bulanan/app-YYYY-MM.db`. Default retensi adalah 7 backup harian dan 1 bulanan.
+Jalankan perintah ini lewat cron atau Task Scheduler setiap hari. Panduan container ada di
+`docs/deploy.md`.
 
 ### Menyinkronkan publikasi
 

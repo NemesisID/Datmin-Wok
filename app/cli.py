@@ -11,6 +11,7 @@ from alembic import command
 from alembic.config import Config
 from sqlmodel import Session
 
+from app.backup import backup_database
 from app.config import get_settings
 from app.db import get_engine
 from app.security import hash_password
@@ -69,6 +70,25 @@ def cmd_import_taxonomy(path: str) -> int:
     return 0
 
 
+def cmd_backup() -> int:
+    settings = get_settings()
+    try:
+        result = backup_database(
+            settings.database_path,
+            settings.backup_dir,
+            daily_keep=settings.backup_daily_keep,
+            monthly_keep=settings.backup_monthly_keep,
+        )
+    except (FileNotFoundError, RuntimeError) as error:
+        print(str(error))
+        return 1
+    print(f"Backup harian: {result.daily}")
+    print(f"Backup bulanan: {result.monthly}")
+    if result.removed:
+        print(f"Backup lama dihapus: {len(result.removed)}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -76,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("hash-password", help="Buat hash kata sandi admin.")
     import_parser = subparsers.add_parser("import-taxonomy", help="Impor seed taksonomi YAML.")
     import_parser.add_argument("path", nargs="?", default="seeds/taxonomy.yaml")
+    subparsers.add_parser("backup", help="Buat backup SQLite dan bersihkan backup lama.")
 
     args = parser.parse_args(argv)
     if args.command == "init-db":
@@ -84,6 +105,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_hash_password()
     if args.command == "import-taxonomy":
         return cmd_import_taxonomy(args.path)
+    if args.command == "backup":
+        return cmd_backup()
     parser.print_help()
     return 1
 

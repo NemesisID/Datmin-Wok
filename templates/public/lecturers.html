@@ -1,0 +1,69 @@
+{% extends "public/base.html" %}
+{% from "public/_macros.html" import label_badge, freshness, topic_badge %}
+
+{% block title %}Daftar dosen · {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="judul-bagian">
+  <div>
+    <h1>Daftar dosen</h1>
+    <p class="petunjuk">Lihat topik utama dan jumlah bukti setiap dosen.</p>
+  </div>
+  {{ freshness(result.latest_sync, result.stale, result.stale_days) }}
+</div>
+
+<form method="get" action="/dosen" class="form-filter-lab" aria-label="Filter lab">
+  <div class="field pendek">
+    <label for="lab-dosen">Lab</label>
+    <select id="lab-dosen" name="lab">
+      <option value="" {% if not lab %}selected{% endif %}>Semua lab</option>
+      {% for pilihan in options.labs %}
+      <option value="{{ pilihan }}" {% if lab == pilihan %}selected{% endif %}>{{ pilihan }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="tombol sekunder">Terapkan</button>
+</form>
+
+{% if result.no_data_state %}
+<section class="kosong" aria-labelledby="belum-data">
+  <h2 id="belum-data">Belum ada data</h2>
+  <p>Admin belum menyinkronkan publikasi dan belum mengunggah data skripsi.</p>
+</section>
+{% else %}
+{% set daftar = result.all_lecturers|selectattr("has_data")|list %}
+{% if daftar %}
+<div class="daftar-dosen-grid">
+  {% for item in daftar %}
+  <article class="baris-dosen">
+    <div>
+      <h2><a href="/dosen/{{ item.lecturer.id }}">{{ item.lecturer.name }}</a></h2>
+      {% if item.lecturer.title %}<p class="kecil">{{ item.lecturer.title }}</p>{% endif %}
+      <div class="topik-baris">
+        {% for score in item.topics %}{{ topic_badge(score.topic) }}{% endfor %}
+      </div>
+      <p class="kecil">{{ item.evidence_count }} bukti relevan.</p>
+    </div>
+    <a class="tautan" href="/dosen/{{ item.lecturer.id }}">Lihat profil</a>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<p class="kosong">Tidak ada dosen dengan bukti di lab ini. Longgarkan filter lab.</p>
+{% endif %}
+
+{% if result.no_data %}
+<section class="bagian" aria-labelledby="tanpa-data-dosen">
+  <h2 id="tanpa-data-dosen">Belum ada data</h2>
+  <ul class="daftar-dosen">
+    {% for item in result.no_data %}
+    <li>
+      <a href="/dosen/{{ item.lecturer.id }}">{{ item.lecturer.name }}</a>
+      {{ label_badge("Belum ada data") }}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}
