@@ -7,20 +7,21 @@ Spesifikasi lengkap: `PRD & Rencana Sistem Rekomendasi Dosen Pembimbing Skripsi 
 
 ## Menjalankan
 
-```bash
-uv sync
-cp .env.example .env
-uv run uvicorn app.main:app --reload
+```powershell
+.\scripts\setup.ps1     # sekali jalan: dependensi, .env, folder data
+.\scripts\dev.ps1       # http://127.0.0.1:8000
 ```
 
-Buka http://127.0.0.1:8000. Cek kesehatan di `/health`.
+Cek kesehatan di `/health`. Panduan lengkap, termasuk isi `.env` dan persiapan data dosen,
+ada di `docs/setup.md`.
 
 ## Tes dan lint
 
-```bash
-uv run pytest
-uv run ruff check .
+```powershell
+.\scripts\check.ps1
 ```
+
+Isinya `ruff check`, `ruff format --check`, dan `pytest`.
 
 ## Spike OpenAlex
 

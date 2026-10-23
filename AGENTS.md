@@ -17,6 +17,14 @@ uv run ruff format .         # format
 uv run python scripts/spike_openalex.py  # spike API OpenAlex
 ```
 
+Di Windows, pakai skrip pembungkusnya:
+
+```powershell
+.\scripts\setup.ps1   # dependensi, .env, folder data
+.\scripts\dev.ps1     # jalankan aplikasi
+.\scripts\check.ps1   # lint, format, tes
+```
+
 ## Aturan yang tidak boleh dilanggar
 
 1. Jangan men-scrape HTML Google Scholar. Sumber data: OpenAlex API, ekspor Scholar, dan file unggahan.
