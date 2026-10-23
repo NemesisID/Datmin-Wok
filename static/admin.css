@@ -81,6 +81,16 @@ select:focus-visible, textarea:focus-visible {
 .tombol:hover { background: #083d79; }
 .tombol.sekunder { background: #fff; color: var(--aksen); }
 .tombol.sekunder:hover { background: var(--aksen-terang); }
+.tombol.bahaya { border-color: var(--bahaya); background: var(--bahaya); }
+.tombol.bahaya:hover { background: #7e1919; }
+.tombol.mini { min-height: 44px; padding: 0.35rem 0.65rem; font-size: 0.88rem; }
+.tombol[disabled] {
+  border-color: var(--garis);
+  background: var(--latar-lemah);
+  color: var(--teks-lemah);
+  cursor: not-allowed;
+}
+.aksi-baris { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
 .tautan, .tautan.bahaya {
   min-height: 44px;

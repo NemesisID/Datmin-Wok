@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlmodel import Session
 
 from app.dedupe import compute_title_hash
-from app.models import Paper, Thesis, Topic, TopicKeyword
+from app.models import Lecturer, Paper, Thesis, ThesisSupervisor, Topic, TopicKeyword
 from app.taxonomy import normalize_keyword, set_taxonomy_version
 
 MINIMAL_KEYWORDS = {
@@ -65,9 +65,35 @@ def make_paper(
     return paper
 
 
-def make_thesis(session: Session, title: str, *, year: int = 2024) -> Thesis:
-    thesis = Thesis(title=title, title_hash=compute_title_hash(title), year=year)
+def make_thesis(
+    session: Session,
+    title: str,
+    *,
+    year: int = 2024,
+    student_name: str = "",
+    nim: str = "",
+    supervisors: list[Lecturer] | None = None,
+) -> Thesis:
+    thesis = Thesis(
+        title=title,
+        title_hash=compute_title_hash(title),
+        year=year,
+        student_name=student_name,
+        nim=nim,
+    )
     session.add(thesis)
     session.commit()
     session.refresh(thesis)
+    for lecturer in supervisors or []:
+        session.add(ThesisSupervisor(thesis_id=thesis.id, lecturer_id=lecturer.id, role=1))
+    if supervisors:
+        session.commit()
     return thesis
+
+
+def make_lecturer(session: Session, name: str, *, title: str = "", active: bool = True) -> Lecturer:
+    lecturer = Lecturer(name=name, title=title, active=active)
+    session.add(lecturer)
+    session.commit()
+    session.refresh(lecturer)
+    return lecturer

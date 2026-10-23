@@ -98,7 +98,8 @@ Panel admin ada di http://127.0.0.1:8000/admin. Di dalamnya:
 3. **Review**: tinjau paper dan skripsi tanpa topik, dengan keyakinan rendah, atau dua topik
    berdekatan. Pilihan manual dikunci dan tidak ditimpa klasifikasi ulang.
 4. **Publikasi**: lihat paper per dosen, buat job sinkronisasi, dan impor ekspor Scholar.
-5. **Duplikat**: periksa judul yang mirip 90 sampai 100 persen pada tahun yang sama.
+5. **Skripsi**: unggah data skripsi lama lewat pratinjau, petakan pembimbing, lalu konfirmasi.
+6. **Duplikat**: periksa judul yang mirip 90 sampai 100 persen pada tahun yang sama.
 
 ### Menyinkronkan publikasi
 
@@ -124,6 +125,39 @@ Halaman dosen punya tombol **Impor CSV/BibTeX Scholar**. Berkas maksimal 10 MB, 
 Scholar, atau judul. Judul yang mirip 90 sampai 100 persen pada tahun yang sama tidak digabung
 otomatis, tetapi masuk antrean **Duplikat** untuk diputuskan admin. Abstrak yang kosong dicari
 ke OpenAlex lewat pencocokan judul.
+
+### Impor skripsi lama
+
+Menu **Skripsi** mengisi riwayat bimbingan dari berkas CSV atau XLSX. Berkas maksimal 10 MB.
+XLSX dibaca dari lembar kerja pertama. CSV boleh memakai pemisah koma, titik koma, tab, atau
+pipa. Kolom wajib hanya judul dan pembimbing 1; kolom opsional adalah pembimbing 2, nama
+mahasiswa, NIM, tahun, dan topik. Contoh ada di `seeds/theses.example.csv`.
+
+Alurnya selalu tiga tahap:
+
+1. **Petakan kolom**: sistem menebak nama kolom, admin bisa mengubahnya.
+2. **Pratinjau**: tiap baris diberi keputusan baru, duplikat persis, duplikat mirip, perlu
+   review, pembimbing tak dikenal, atau tidak valid. Baris review bisa ditambahkan atau
+   dilewati satu per satu maupun sekaligus. Nama pembimbing yang belum cocok dipetakan ke
+   dosen; alias disimpan untuk impor berikutnya.
+3. **Konfirmasi**: hanya baris baru dan baris yang ditambahkan manual yang disimpan. Insert dan
+   klasifikasi topik berjalan dalam satu transaksi. Sebelum konfirmasi tidak ada skripsi yang
+   masuk ke basis data.
+
+Aturan duplikat:
+
+- Judul dan tahun sama, atau NIM sama: dilewati sebagai duplikat persis.
+- Judul sama dengan selisih tahun lebih dari satu: perlu review.
+- Kemiripan judul di atas 90 persen dan ada pembimbing yang sama pada tahun berdekatan:
+  dilewati sebagai duplikat mirip.
+- Kemiripan 80 sampai 90 persen pada blok pembimbing yang sama dan tahun berdekatan: perlu
+  review.
+- Duplikat di dalam satu berkas juga dideteksi.
+
+Kolom topik hanya dipakai kalau namanya persis sama dengan topik aktif. Label dari impor
+dikunci dengan `source="import"`; kalau tidak cocok, classifier tetap berjalan dari judul.
+Pratinjau yang tidak dikonfirmasi dalam 24 jam dibersihkan. **Rollback** pada batch selesai
+menghapus skripsi batch itu beserta alias yang dibuatnya, tanpa menyentuh batch lain.
 
 ### Review dan klasifikasi ulang
 

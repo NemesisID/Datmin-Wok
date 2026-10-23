@@ -14,6 +14,8 @@ from app.db import get_session
 from app.dedupe import merge_paper_into
 from app.models import (
     LABS,
+    ImportBatch,
+    ImportRow,
     Lecturer,
     LecturerOpenAlexId,
     LecturerPaper,
@@ -41,6 +43,20 @@ from app.security import (
 from app.sync import enqueue_job, publication_window_start, store_papers
 from app.taxonomy import bump_taxonomy_version, get_taxonomy_version, normalize_keyword
 from app.templating import flash, render
+from app.thesis_import import (
+    MAPPING_FIELDS,
+    add_alias,
+    apply_mapping,
+    cleanup_expired_batches,
+    confirm_batch,
+    create_batch,
+    headers_of,
+    mapping_of,
+    rollback_batch,
+    set_all_review_decisions,
+    set_row_decision,
+    summary_of,
+)
 
 
 async def csrf_guard(request: Request) -> None:
@@ -56,6 +72,24 @@ router = APIRouter(prefix="/admin", dependencies=[Depends(csrf_guard)])
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 IMPORT_SUFFIXES = (".csv", ".bib", ".bibtex")
+THESIS_SUFFIXES = (".csv", ".xlsx")
+THESIS_PAGE_SIZE = 100
+BATCH_STATUS_LABELS = {
+    "mapping": "Pemetaan kolom",
+    "preview": "Pratinjau",
+    "committed": "Selesai",
+    "rolled_back": "Dibatalkan",
+}
+DECISION_LABELS = {
+    "new": "Baru",
+    "keep": "Ditambahkan (manual)",
+    "skip": "Dilewati (manual)",
+    "exact": "Duplikat persis",
+    "similar": "Duplikat mirip",
+    "review": "Perlu review",
+    "unknown_supervisor": "Pembimbing tak dikenal",
+    "invalid": "Tidak valid",
+}
 
 _limiter: LoginRateLimiter | None = None
 
@@ -156,6 +190,7 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
             "topics": sum(1 for item in topics if item.active),
             "keywords": len(keywords),
             "papers": len(session.exec(select(Paper)).all()),
+            "theses": len(session.exec(select(Thesis)).all()),
             "duplicates": len(duplicates),
             "pending_jobs": len(pending_jobs),
             "review": review_paper_count + review_thesis_count,
@@ -1010,3 +1045,280 @@ def keyword_remove(
         session.commit()
         flash(request, "Kata kunci dihapus.")
     return _redirect(f"/admin/taksonomi/{topic_id}")
+
+
+def _batch_redirect(batch_id: int) -> str:
+    return f"/admin/skripsi/{batch_id}"
+
+
+@router.get("/skripsi")
+def thesis_batch_list(request: Request, session: Session = Depends(get_session)):
+    cleanup_expired_batches(session)
+    batches = session.exec(
+        select(ImportBatch).order_by(ImportBatch.created_at.desc(), ImportBatch.id.desc()).limit(50)
+    ).all()
+    items = [{"batch": batch, "summary": summary_of(batch)} for batch in batches]
+    return render(
+        request,
+        "admin/thesis_upload.html",
+        items=items,
+        max_mb=MAX_UPLOAD_BYTES // (1024 * 1024),
+        status_labels=BATCH_STATUS_LABELS,
+    )
+
+
+@router.post("/skripsi/unggah")
+async def thesis_upload(
+    request: Request,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+):
+    filename = (file.filename or "").strip()
+    if not filename.lower().endswith(THESIS_SUFFIXES):
+        flash(request, "Berkas skripsi harus .csv atau .xlsx.")
+        return _redirect("/admin/skripsi")
+
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        flash(request, "Berkas lebih dari 10 MB.")
+        return _redirect("/admin/skripsi")
+    try:
+        batch = create_batch(session, filename, content)
+    except ValueError as error:
+        flash(request, str(error))
+        return _redirect("/admin/skripsi")
+
+    flash(
+        request,
+        f"Berkas {batch.filename} dibaca. Petakan kolom sebelum melihat pratinjau.",
+    )
+    return _redirect(f"/admin/skripsi/{batch.id}/petakan")
+
+
+@router.get("/skripsi/{batch_id}/petakan")
+def thesis_mapping_form(
+    request: Request,
+    batch_id: int,
+    session: Session = Depends(get_session),
+):
+    cleanup_expired_batches(session)
+    batch = session.get(ImportBatch, batch_id)
+    if batch is None:
+        flash(request, "Batch impor tidak ditemukan atau sudah kedaluwarsa.")
+        return _redirect("/admin/skripsi")
+    if batch.status != "mapping":
+        return _redirect(_batch_redirect(batch_id))
+
+    rows = session.exec(
+        select(ImportRow)
+        .where(ImportRow.batch_id == batch_id)
+        .order_by(ImportRow.row_number, ImportRow.id)
+        .limit(5)
+    ).all()
+    return render(
+        request,
+        "admin/thesis_mapping.html",
+        batch=batch,
+        headers=headers_of(batch),
+        mapping=mapping_of(batch),
+        fields=MAPPING_FIELDS,
+        samples=rows,
+    )
+
+
+@router.post("/skripsi/{batch_id}/petakan")
+def thesis_mapping_save(
+    request: Request,
+    batch_id: int,
+    map_judul: str = Form(""),
+    map_pembimbing1: str = Form(""),
+    map_pembimbing2: str = Form(""),
+    map_nama: str = Form(""),
+    map_nim: str = Form(""),
+    map_tahun: str = Form(""),
+    map_topik: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    batch = session.get(ImportBatch, batch_id)
+    if batch is None:
+        flash(request, "Batch impor tidak ditemukan.")
+        return _redirect("/admin/skripsi")
+    if batch.status != "mapping":
+        flash(request, "Pemetaan kolom batch ini sudah disimpan.")
+        return _redirect(_batch_redirect(batch_id))
+
+    mapping = {
+        "judul": map_judul,
+        "pembimbing1": map_pembimbing1,
+        "pembimbing2": map_pembimbing2,
+        "nama": map_nama,
+        "nim": map_nim,
+        "tahun": map_tahun,
+        "topik": map_topik,
+    }
+    try:
+        summary = apply_mapping(session, batch, mapping)
+    except ValueError as error:
+        flash(request, str(error))
+        return _redirect(f"/admin/skripsi/{batch_id}/petakan")
+
+    flash(
+        request,
+        f"Pratinjau siap: {summary['new']} baru, {summary['duplicate']} duplikat, "
+        f"{summary['review']} perlu review, {summary['unknown']} pembimbing tak dikenal.",
+    )
+    return _redirect(_batch_redirect(batch_id))
+
+
+@router.get("/skripsi/{batch_id}")
+def thesis_batch_detail(
+    request: Request,
+    batch_id: int,
+    page: int = 1,
+    session: Session = Depends(get_session),
+):
+    cleanup_expired_batches(session)
+    batch = session.get(ImportBatch, batch_id)
+    if batch is None:
+        flash(request, "Batch impor tidak ditemukan atau sudah kedaluwarsa.")
+        return _redirect("/admin/skripsi")
+    if batch.status == "mapping":
+        return _redirect(f"/admin/skripsi/{batch_id}/petakan")
+
+    summary = summary_of(batch)
+    total = int(summary["total"])
+    pages = max(1, (total + THESIS_PAGE_SIZE - 1) // THESIS_PAGE_SIZE)
+    page = max(1, min(page, pages))
+    rows = session.exec(
+        select(ImportRow)
+        .where(ImportRow.batch_id == batch_id)
+        .order_by(ImportRow.row_number, ImportRow.id)
+        .offset((page - 1) * THESIS_PAGE_SIZE)
+        .limit(THESIS_PAGE_SIZE)
+    ).all()
+    lecturers = session.exec(select(Lecturer).order_by(Lecturer.name)).all()
+    return render(
+        request,
+        "admin/thesis_batch.html",
+        batch=batch,
+        summary=summary,
+        rows=rows,
+        page=page,
+        pages=pages,
+        lecturers=lecturers,
+        status_label=BATCH_STATUS_LABELS.get(batch.status, batch.status),
+        decision_labels=DECISION_LABELS,
+        rollback=(batch.summary_json or {}).get("rollback"),
+    )
+
+
+@router.post("/skripsi/{batch_id}/baris/{row_id}")
+def thesis_row_decision(
+    request: Request,
+    batch_id: int,
+    row_id: int,
+    keputusan: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    batch = session.get(ImportBatch, batch_id)
+    row = session.get(ImportRow, row_id)
+    if batch is None or row is None or row.batch_id != batch_id:
+        flash(request, "Baris impor tidak ditemukan.")
+        return _redirect("/admin/skripsi")
+    try:
+        set_row_decision(session, batch, row, keputusan)
+    except ValueError as error:
+        flash(request, str(error))
+    return _redirect(_batch_redirect(batch_id))
+
+
+@router.post("/skripsi/{batch_id}/putuskan")
+def thesis_bulk_decision(
+    request: Request,
+    batch_id: int,
+    aksi: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    batch = session.get(ImportBatch, batch_id)
+    if batch is None:
+        flash(request, "Batch impor tidak ditemukan.")
+        return _redirect("/admin/skripsi")
+    decision = {"lewati": "skip", "tambahkan": "keep"}.get(aksi)
+    if decision is None:
+        flash(request, "Pilihan keputusan tidak dikenal.")
+        return _redirect(_batch_redirect(batch_id))
+    try:
+        count = set_all_review_decisions(session, batch, decision)
+    except ValueError as error:
+        flash(request, str(error))
+        return _redirect(_batch_redirect(batch_id))
+    flash(request, f"{count} baris review diputuskan.")
+    return _redirect(_batch_redirect(batch_id))
+
+
+@router.post("/skripsi/{batch_id}/alias")
+def thesis_alias(
+    request: Request,
+    batch_id: int,
+    nama: str = Form(""),
+    dosen_id: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    batch = session.get(ImportBatch, batch_id)
+    if batch is None:
+        flash(request, "Batch impor tidak ditemukan.")
+        return _redirect("/admin/skripsi")
+    try:
+        lecturer_id = int(dosen_id)
+    except ValueError:
+        flash(request, "Pilih dosen untuk nama pembimbing itu.")
+        return _redirect(_batch_redirect(batch_id))
+    try:
+        add_alias(session, batch, nama, lecturer_id)
+    except ValueError as error:
+        flash(request, str(error))
+        return _redirect(_batch_redirect(batch_id))
+    flash(request, f"Nama {nama} dipetakan ke dosen.")
+    return _redirect(_batch_redirect(batch_id))
+
+
+@router.post("/skripsi/{batch_id}/konfirmasi")
+def thesis_confirm(
+    request: Request,
+    batch_id: int,
+    session: Session = Depends(get_session),
+):
+    batch = session.get(ImportBatch, batch_id)
+    if batch is None:
+        flash(request, "Batch impor tidak ditemukan.")
+        return _redirect("/admin/skripsi")
+    try:
+        summary = confirm_batch(session, batch)
+    except ValueError as error:
+        flash(request, str(error))
+        return _redirect(_batch_redirect(batch_id))
+    flash(
+        request,
+        f"Batch #{batch_id} dikonfirmasi: {summary['inserted']} skripsi masuk, "
+        f"{summary['duplicate']} dilewati, {summary['invalid']} tidak valid.",
+    )
+    return _redirect(_batch_redirect(batch_id))
+
+
+@router.post("/skripsi/{batch_id}/rollback")
+def thesis_rollback(
+    request: Request,
+    batch_id: int,
+    session: Session = Depends(get_session),
+):
+    batch = session.get(ImportBatch, batch_id)
+    if batch is None:
+        flash(request, "Batch impor tidak ditemukan.")
+        return _redirect("/admin/skripsi")
+    try:
+        count = rollback_batch(session, batch)
+    except ValueError as error:
+        flash(request, str(error))
+        return _redirect(_batch_redirect(batch_id))
+    flash(request, f"Batch #{batch_id} dibatalkan; {count} skripsi dihapus.")
+    return _redirect(_batch_redirect(batch_id))

@@ -49,4 +49,8 @@ Fase 3 selesai: klasifikasi topik multi-label deterministik untuk paper dan skri
 sub-topik dengan fallback "Umum", antrean review dengan navigasi keyboard, override
 manual terkunci, FTS5 untuk pencarian judul, dan skrip evaluasi golden set (micro/macro F1).
 
-Fase 4 sampai 6 menyusul sesuai bagian 13 PRD.
+Fase 4 selesai: impor skripsi lama dari CSV/XLSX lewat pemetaan kolom dan pratinjau,
+deteksi duplikat berbasis judul/tahun/NIM/kemiripan dengan blok pembimbing, pemetaan alias
+pembimbing, konfirmasi atomik, rollback batch, dan pembersihan pratinjau kedaluwarsa.
+
+Fase 5 sampai 6 menyusul sesuai bagian 13 PRD.

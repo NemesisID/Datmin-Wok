@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Petakan kolom skripsi · {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/admin/skripsi">Kembali ke impor skripsi</a></p>
+<h1>Petakan kolom</h1>
+<p class="petunjuk">Berkas <strong>{{ batch.filename }}</strong> sudah dibaca.
+Pilih kolom yang sesuai. Judul dan pembimbing 1 wajib dipetakan.</p>
+
+<form method="post" action="/admin/skripsi/{{ batch.id }}/petakan" class="formulir">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% for field in fields %}
+  <div class="field">
+    <label for="map-{{ field.key }}">{{ field.label }}{% if field.required %} <span class="kecil">(wajib)</span>{% endif %}</label>
+    <select id="map-{{ field.key }}" name="map_{{ field.key }}">
+      <option value="">— tidak dipakai —</option>
+      {% for header in headers %}
+      <option value="{{ loop.index0 }}" {% if mapping[field.key] == loop.index0 %}selected{% endif %}>
+        {{ header }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endfor %}
+  <button type="submit" class="tombol">Simpan dan lihat pratinjau</button>
+</form>
+
+<section class="bagian" aria-labelledby="judul-contoh">
+  <h2 id="judul-contoh">Contoh baris</h2>
+  <p class="bantuan">Lima baris pertama, sesuai urutan kolom di berkas.</p>
+  {% if samples %}
+  <div class="tabel-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Baris</th>
+          {% for header in headers %}<th>{{ header }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for sample in samples %}
+        <tr>
+          <td>{{ sample.row_number }}</td>
+          {% for cell in sample.raw_json["values"] %}<td>{{ cell }}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="kosong">Tidak ada baris contoh.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Pratinjau impor skripsi · {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/admin/skripsi">Kembali ke impor skripsi</a></p>
+<div class="judul-halaman">
+  <h1>{{ batch.filename }}</h1>
+  <span class="lencana">{{ status_label }}</span>
+</div>
+<p class="petunjuk">Batch #{{ batch.id }}, diunggah {{ batch.created_at.strftime("%Y-%m-%d %H:%M") }}.
+Hanya baris berstatus baru atau ditambahkan manual yang akan disimpan.</p>
+
+<dl class="angka">
+  <div><dt>Baru</dt><dd>{{ summary["new"] }}</dd></div>
+  <div><dt>Dilewati</dt><dd>{{ summary["duplicate"] }}</dd></div>
+  <div><dt>Perlu review</dt><dd>{{ summary["review"] }}</dd></div>
+  <div><dt>Pembimbing tak dikenal</dt><dd>{{ summary["unknown"] }}</dd></div>
+  <div><dt>Tidak valid</dt><dd>{{ summary["invalid"] }}</dd></div>
+  {% if batch.status == "committed" %}
+  <div><dt>Masuk basis data</dt><dd>{{ summary["inserted"] }}</dd></div>
+  {% endif %}
+</dl>
+
+{% if batch.status == "preview" %}
+  {% if summary["unknown_names"] %}
+  <section class="bagian" aria-labelledby="judul-asing">
+    <h2 id="judul-asing">Pembimbing tak dikenal</h2>
+    <p class="petunjuk">Nama ini muncul di berkas tetapi belum cocok dengan dosen mana pun.
+    Petakan sekali; alias disimpan untuk impor berikutnya.</p>
+    {% if lecturers %}
+      {% for nama in summary["unknown_names"] %}
+      <form method="post" action="/admin/skripsi/{{ batch.id }}/alias" class="formulir baris">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="nama" value="{{ nama }}">
+        <div class="field tumbuh">
+          <label for="dosen-{{ loop.index }}">{{ nama }}</label>
+          <select id="dosen-{{ loop.index }}" name="dosen_id" required>
+            <option value="">— pilih dosen —</option>
+            {% for dosen in lecturers %}
+            <option value="{{ dosen.id }}">{{ dosen.name }}{% if dosen.title %} · {{ dosen.title }}{% endif %}{% if not dosen.active %} (nonaktif){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="tombol sekunder">Petakan nama</button>
+      </form>
+      {% endfor %}
+    {% else %}
+    <p class="kosong">Belum ada dosen. <a href="/admin/dosen/baru">Tambah dosen</a> lalu petakan.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if summary["review"] %}
+  <section class="kotak-kerja" aria-labelledby="judul-review">
+    <h2 id="judul-review">{{ summary["review"] }} baris perlu review</h2>
+    <div class="aksi-baris">
+      <form method="post" action="/admin/skripsi/{{ batch.id }}/putuskan">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="aksi" value="tambahkan">
+        <button type="submit" class="tombol">Tambahkan semua</button>
+      </form>
+      <form method="post" action="/admin/skripsi/{{ batch.id }}/putuskan">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="aksi" value="lewati">
+        <button type="submit" class="tombol sekunder">Lewati semua</button>
+      </form>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="kotak-kerja" aria-labelledby="judul-konfirmasi">
+    <div>
+      <h2 id="judul-konfirmasi">Konfirmasi batch</h2>
+      {% if summary["review"] or summary["unknown"] %}
+      <p class="bantuan">Selesaikan review dan pemetaan pembimbing dulu. Baris tidak valid
+      akan dilewati otomatis.</p>
+      {% else %}
+      <p class="bantuan">{{ summary["new"] }} skripsi akan disimpan, {{ summary["duplicate"] }}
+      dilewati, {{ summary["invalid"] }} tidak valid dilewati. Tindakan ini atomik.</p>
+      {% endif %}
+    </div>
+    <form method="post" action="/admin/skripsi/{{ batch.id }}/konfirmasi">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="tombol" {% if summary["review"] or summary["unknown"] %}disabled{% endif %}>Konfirmasi dan simpan</button>
+    </form>
+  </section>
+{% elif batch.status == "committed" %}
+  <section class="kotak-kerja" aria-labelledby="judul-batal">
+    <div>
+      <h2 id="judul-batal">Batch sudah dikonfirmasi</h2>
+      <p class="bantuan">{{ batch.confirmed_at.strftime("%Y-%m-%d %H:%M") if batch.confirmed_at else "" }}.
+      Rollback menghapus {{ summary["inserted"] }} skripsi dari batch ini beserta alias yang dibuatnya.</p>
+    </div>
+    <form method="post" action="/admin/skripsi/{{ batch.id }}/rollback"
+          onsubmit="return confirm('Batalkan batch ini dan hapus skripsi yang sudah masuk?')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="tombol bahaya">Rollback batch</button>
+    </form>
+  </section>
+{% elif batch.status == "rolled_back" %}
+  <p class="flash">Batch ini sudah dibatalkan.
+  {% if rollback %}{{ rollback["theses"] }} skripsi dihapus pada {{ rollback["at"][:16].replace("T", " ") }}.
+  {% endif %}Berkas dapat diunggah ulang sebagai batch baru.</p>
+{% endif %}
+
+<section class="bagian" aria-labelledby="judul-baris">
+  <h2 id="judul-baris">Baris impor ({{ summary["total"] }})</h2>
+  {% if rows %}
+  <div class="tabel-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Baris</th>
+          <th>Judul</th>
+          <th>Tahun / NIM</th>
+          <th>Pembimbing</th>
+          <th>Keputusan</th>
+          <th>Catatan</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set data = row.normalized_json or {} %}
+        <tr>
+          <td>{{ row.row_number }}</td>
+          <td>
+            {{ data.get("title") or "—" }}
+            {% if data.get("topic") %}<br><span class="kecil">Topik: {{ data.get("topic") }}</span>{% endif %}
+          </td>
+          <td>
+            {{ data.get("year") or "—" }}
+            {% if data.get("nim") %}<br><span class="kecil">NIM {{ data.get("nim") }}</span>{% endif %}
+          </td>
+          <td>
+            {% if data.get("supervisors") %}
+              {% for dosen in data.get("supervisors") %}
+              <span class="lencana hijau">{{ dosen["name"] }}</span>
+              {% endfor %}
+            {% endif %}
+            {% if data.get("unknown_supervisors") %}
+              {% for nama in data.get("unknown_supervisors") %}
+              <span class="lencana merah">{{ nama }}</span>
+              {% endfor %}
+            {% endif %}
+            {% if not data.get("supervisors") and not data.get("unknown_supervisors") %}—{% endif %}
+          </td>
+          <td>
+            {% if row.decision in ("review", "unknown_supervisor", "invalid") %}
+            <span class="lencana merah">{{ decision_labels.get(row.decision, row.decision) }}</span>
+            {% elif row.decision in ("new", "keep") %}
+            <span class="lencana hijau">{{ decision_labels.get(row.decision, row.decision) }}</span>
+            {% else %}
+            <span class="lencana abu">{{ decision_labels.get(row.decision, row.decision) }}</span>
+            {% endif %}
+            {% if row.thesis_id %}<br><span class="kecil">Skripsi #{{ row.thesis_id }}</span>{% endif %}
+          </td>
+          <td>{{ row.note or "—" }}</td>
+          <td>
+            {% if batch.status == "preview" and row.decision == "review" %}
+            <div class="aksi-baris">
+              <form method="post" action="/admin/skripsi/{{ batch.id }}/baris/{{ row.id }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="keputusan" value="keep">
+                <button type="submit" class="tombol mini">Tambahkan</button>
+              </form>
+              <form method="post" action="/admin/skripsi/{{ batch.id }}/baris/{{ row.id }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="keputusan" value="skip">
+                <button type="submit" class="tombol sekunder mini">Lewati</button>
+              </form>
+            </div>
+            {% elif batch.status == "preview" and row.decision == "unknown_supervisor" %}
+            <span class="kecil">Petakan pembimbing di atas.</span>
+            {% else %}
+            —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pages > 1 %}
+  <nav class="paginasi" aria-label="Halaman baris impor">
+    {% if page > 1 %}
+    <a class="tombol sekunder" href="/admin/skripsi/{{ batch.id }}?page={{ page - 1 }}">Sebelumnya</a>
+    {% endif %}
+    <span class="petunjuk">Halaman {{ page }} dari {{ pages }}</span>
+    {% if page < pages %}
+    <a class="tombol sekunder" href="/admin/skripsi/{{ batch.id }}?page={{ page + 1 }}">Berikutnya</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+  {% else %}
+  <p class="kosong">Tidak ada baris untuk ditampilkan.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -10,6 +10,7 @@ Setiap perubahan topik atau kata kunci menaikkan versi ini.</p>
   <div><dt>Topik aktif</dt><dd>{{ counts.topics }}</dd></div>
   <div><dt>Kata kunci</dt><dd>{{ counts.keywords }}</dd></div>
   <div><dt>Paper</dt><dd>{{ counts.papers }}</dd></div>
+  <div><dt>Skripsi</dt><dd>{{ counts.theses }}</dd></div>
   <div><dt>Job menunggu</dt><dd>{{ counts.pending_jobs }}</dd></div>
   <div><dt>Duplikat</dt><dd>{{ counts.duplicates }}</dd></div>
 </dl>
@@ -19,7 +20,8 @@ Setiap perubahan topik atau kata kunci menaikkan versi ini.</p>
   <li><a href="/admin/dosen">Tambah dosen dan petakan ID OpenAlex</a></li>
   <li>Buat job dari halaman dosen, lalu jalankan <code>uv run python -m app.jobs sync</code></li>
   <li><a href="/admin/duplikat">Periksa kandidat duplikat</a> setelah sinkronisasi</li>
+  <li><a href="/admin/skripsi">Unggah data skripsi lama</a> dalam format CSV atau XLSX</li>
   <li><a href="/admin/taksonomi">Periksa topik dan kata kunci</a></li>
 </ul>
-<p class="petunjuk">Klasifikasi topik dan review bukti menyusul di Fase 3.</p>
+<p class="petunjuk">Import skripsi berjalan lewat pratinjau; data baru masuk setelah dikonfirmasi.</p>
 {% endblock %}

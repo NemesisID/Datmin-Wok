@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Impor skripsi · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="judul-halaman">
+  <h1>Impor skripsi lama</h1>
+  <a class="tombol sekunder" href="/admin/review">Buka review</a>
+</div>
+<p class="petunjuk">Unggah data skripsi yang sudah lulus untuk mengisi riwayat bimbingan.
+Tidak ada yang masuk ke basis data sebelum pratinjau dikonfirmasi.</p>
+
+<ol class="daftar">
+  <li>Unggah berkas CSV atau XLSX.</li>
+  <li>Petakan kolom judul, pembimbing, dan kolom pendukung.</li>
+  <li>Periksa pratinjau: putuskan baris yang perlu review dan petakan pembimbing tak dikenal.</li>
+  <li>Konfirmasi. Hanya setelah itu skripsi disimpan dan diklasifikasikan.</li>
+</ol>
+
+<section aria-labelledby="judul-unggah">
+  <h2 id="judul-unggah">Unggah berkas baru</h2>
+  <form method="post" action="/admin/skripsi/unggah" enctype="multipart/form-data" class="formulir">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field">
+      <label for="file">Berkas skripsi</label>
+      <input id="file" name="file" type="file" accept=".csv,.xlsx" required>
+      <p class="bantuan">Maksimal {{ max_mb }} MB. CSV dipisah koma, titik koma, atau tab.
+      XLSX dibaca dari lembar kerja pertama. Minimal ada kolom judul dan pembimbing 1.</p>
+    </div>
+    <button type="submit" class="tombol">Baca dan petakan</button>
+  </form>
+</section>
+
+<section class="bagian" aria-labelledby="judul-riwayat">
+  <h2 id="judul-riwayat">Riwayat impor</h2>
+  {% if items %}
+  <div class="tabel-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Berkas</th>
+          <th>Diunggah</th>
+          <th>Status</th>
+          <th>Hasil</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        {% set batch = item.batch %}
+        {% set summary = item.summary %}
+        <tr>
+          <td>{{ batch.filename }}<br><span class="kecil">Batch #{{ batch.id }}</span></td>
+          <td>{{ batch.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td><span class="lencana">{{ status_labels.get(batch.status, batch.status) }}</span></td>
+          <td>
+            <span class="kecil">
+              {{ summary["new"] }} baru · {{ summary["duplicate"] }} dilewati ·
+              {{ summary["review"] }} review · {{ summary["unknown"] }} tak dikenal ·
+              {{ summary["invalid"] }} tidak valid
+            </span>
+          </td>
+          <td>
+            {% if batch.status == "mapping" %}
+            <a class="tombol sekunder" href="/admin/skripsi/{{ batch.id }}/petakan">Petakan kolom</a>
+            {% else %}
+            <a class="tombol sekunder" href="/admin/skripsi/{{ batch.id }}">Lihat</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="kosong">Belum ada berkas skripsi yang diunggah.</p>
+  {% endif %}
+</section>
+{% endblock %}

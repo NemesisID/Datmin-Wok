@@ -37,9 +37,15 @@ def test_migrations_create_core_tables(tmp_path, monkeypatch) -> None:
         "paper_topics",
         "paper_duplicates",
         "theses",
+        "thesis_supervisors",
+        "thesis_topics",
+        "import_batches",
+        "import_rows",
+        "lecturer_aliases",
         "sync_jobs",
         "meta",
         "papers_fts",
     } <= tables
     assert "reviewed_at" in paper_columns
     assert "reviewed_at" in thesis_columns
+    assert "import_batch_id" in thesis_columns

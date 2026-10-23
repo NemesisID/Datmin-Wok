@@ -182,6 +182,7 @@ def reclassify_papers(
     paper_ids: list[int] | None = None,
     classifier: Classifier | None = None,
     version: int | None = None,
+    commit: bool = True,
 ) -> ReclassifyStats:
     classifier = classifier or Classifier.from_session(session)
     version = get_taxonomy_version(session) if version is None else version
@@ -203,7 +204,8 @@ def reclassify_papers(
         stats.scanned += 1
         if predictions:
             stats.labeled += 1
-    session.commit()
+    if commit:
+        session.commit()
     return stats
 
 
@@ -213,6 +215,7 @@ def reclassify_theses(
     thesis_ids: list[int] | None = None,
     classifier: Classifier | None = None,
     version: int | None = None,
+    commit: bool = True,
 ) -> ReclassifyStats:
     classifier = classifier or Classifier.from_session(session)
     version = get_taxonomy_version(session) if version is None else version
@@ -234,7 +237,8 @@ def reclassify_theses(
         stats.scanned += 1
         if predictions:
             stats.labeled += 1
-    session.commit()
+    if commit:
+        session.commit()
     return stats
 
 
