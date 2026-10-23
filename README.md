@@ -41,4 +41,8 @@ Fase 1 selesai: skema 17 tabel dengan Alembic, seed taksonomi 23 topik dan 166 k
 login admin dengan CSRF dan pembatas percobaan, CRUD dosen, pemetaan ID OpenAlex,
 editor taksonomi dengan `taxonomy_version`.
 
-Fase 2 sampai 6 menyusul sesuai bagian 13 PRD.
+Fase 2 selesai: sinkronisasi OpenAlex lewat `sync_jobs` dan CLI `python -m app.jobs`,
+impor CSV/BibTeX Scholar, deduplikasi berbasis DOI/ID/judul, serta antrean duplikat
+untuk judul yang mirip 90 sampai 100 persen pada tahun yang sama.
+
+Fase 3 sampai 6 menyusul sesuai bagian 13 PRD.

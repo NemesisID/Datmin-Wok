@@ -4,21 +4,29 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 
 from app.config import get_settings
 from app.db import get_session
+from app.dedupe import merge_paper_into
 from app.models import (
     LABS,
     Lecturer,
     LecturerOpenAlexId,
+    LecturerPaper,
+    Paper,
+    PaperDuplicate,
+    PaperTopic,
+    SyncJob,
     Topic,
     TopicKeyword,
     TopicLab,
     utcnow,
 )
+from app.providers.manual import ManualImportProvider
+from app.providers.openalex import build_client
 from app.security import (
     LoginRateLimiter,
     csrf_ok,
@@ -27,6 +35,7 @@ from app.security import (
     parse_scholar_id,
     verify_password,
 )
+from app.sync import enqueue_job, publication_window_start, store_papers
 from app.taxonomy import bump_taxonomy_version, get_taxonomy_version, normalize_keyword
 from app.templating import flash, render
 
@@ -41,6 +50,9 @@ async def csrf_guard(request: Request) -> None:
 
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(csrf_guard)])
+
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+IMPORT_SUFFIXES = (".csv", ".bib", ".bibtex")
 
 _limiter: LoginRateLimiter | None = None
 
@@ -127,6 +139,10 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
     lecturers = session.exec(select(Lecturer)).all()
     topics = session.exec(select(Topic)).all()
     keywords = session.exec(select(TopicKeyword)).all()
+    duplicates = session.exec(
+        select(PaperDuplicate).where(PaperDuplicate.status == "pending")
+    ).all()
+    pending_jobs = session.exec(select(SyncJob).where(SyncJob.status == "pending")).all()
     return render(
         request,
         "admin/dashboard.html",
@@ -135,6 +151,9 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
             "active_lecturers": sum(1 for item in lecturers if item.active),
             "topics": sum(1 for item in topics if item.active),
             "keywords": len(keywords),
+            "papers": len(session.exec(select(Paper)).all()),
+            "duplicates": len(duplicates),
+            "pending_jobs": len(pending_jobs),
             "taxonomy_version": get_taxonomy_version(session),
         },
     )
@@ -214,11 +233,25 @@ def lecturer_edit_form(request: Request, lecturer_id: int, session: Session = De
         .where(LecturerOpenAlexId.lecturer_id == lecturer_id)
         .order_by(LecturerOpenAlexId.confirmed_at)
     ).all()
+    papers = session.exec(
+        select(Paper)
+        .join(LecturerPaper, LecturerPaper.paper_id == Paper.id)
+        .where(LecturerPaper.lecturer_id == lecturer_id)
+        .order_by(Paper.year.desc(), Paper.citations.desc(), Paper.title)
+    ).all()
+    jobs = session.exec(
+        select(SyncJob)
+        .where(SyncJob.lecturer_id == lecturer_id)
+        .order_by(SyncJob.id.desc())
+        .limit(10)
+    ).all()
     return render(
         request,
         "admin/lecturer_form.html",
         lecturer=lecturer,
         openalex_ids=openalex_ids,
+        papers=papers,
+        jobs=jobs,
     )
 
 
@@ -315,6 +348,236 @@ def openalex_remove(
         session.commit()
         flash(request, "Pemetaan ID OpenAlex dihapus.")
     return _redirect(f"/admin/dosen/{lecturer_id}")
+
+
+def _fail_job(session: Session, job_id: int | None, message: str) -> None:
+    session.rollback()
+    job = session.get(SyncJob, job_id) if job_id else None
+    if job is not None:
+        job.status = "failed"
+        job.finished_at = utcnow()
+        job.error = message[:500]
+        session.add(job)
+        session.commit()
+
+
+@router.post("/dosen/{lecturer_id}/sinkronkan")
+def lecturer_sync(
+    request: Request,
+    lecturer_id: int,
+    session: Session = Depends(get_session),
+):
+    lecturer = session.get(Lecturer, lecturer_id)
+    if lecturer is None:
+        flash(request, "Dosen tidak ditemukan.")
+        return _redirect("/admin/dosen")
+
+    openalex_ids = session.exec(
+        select(LecturerOpenAlexId).where(LecturerOpenAlexId.lecturer_id == lecturer_id)
+    ).all()
+    if not openalex_ids:
+        flash(request, "Dosen ini belum punya ID OpenAlex. Petakan dulu sebelum sinkronisasi.")
+        return _redirect(f"/admin/dosen/{lecturer_id}")
+
+    job = enqueue_job(session, lecturer_id)
+    flash(
+        request,
+        f"Job sinkronisasi #{job.id} dibuat. Jalankan "
+        "`uv run python -m app.jobs sync` untuk memproses.",
+    )
+    return _redirect(f"/admin/dosen/{lecturer_id}")
+
+
+@router.get("/dosen/{lecturer_id}/impor")
+def lecturer_import_form(
+    request: Request,
+    lecturer_id: int,
+    session: Session = Depends(get_session),
+):
+    lecturer = session.get(Lecturer, lecturer_id)
+    if lecturer is None:
+        flash(request, "Dosen tidak ditemukan.")
+        return _redirect("/admin/dosen")
+    return render(
+        request,
+        "admin/import.html",
+        lecturer=lecturer,
+        max_mb=MAX_UPLOAD_BYTES // (1024 * 1024),
+    )
+
+
+@router.post("/dosen/{lecturer_id}/impor")
+async def lecturer_import(
+    request: Request,
+    lecturer_id: int,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+):
+    lecturer = session.get(Lecturer, lecturer_id)
+    if lecturer is None:
+        flash(request, "Dosen tidak ditemukan.")
+        return _redirect("/admin/dosen")
+
+    filename = (file.filename or "").strip()
+    if not filename.lower().endswith(IMPORT_SUFFIXES):
+        flash(request, "Berkas harus .csv, .bib, atau .bibtex.")
+        return _redirect(f"/admin/dosen/{lecturer_id}/impor")
+
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        flash(request, "Berkas lebih dari 10 MB.")
+        return _redirect(f"/admin/dosen/{lecturer_id}/impor")
+    if not content:
+        flash(request, "Berkas kosong.")
+        return _redirect(f"/admin/dosen/{lecturer_id}/impor")
+
+    settings = get_settings()
+    client = build_client(settings.openalex_base_url, settings.openalex_api_key)
+    job = SyncJob(
+        lecturer_id=lecturer_id,
+        source="manual",
+        status="running",
+        attempts=1,
+        started_at=utcnow(),
+    )
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    job_id = job.id
+
+    try:
+        provider = ManualImportProvider(filename, content, client=client)
+        result = provider.fetch(lecturer, [], publication_window_start(settings))
+        stats = store_papers(session, lecturer, result.papers, provider.name)
+    except ValueError as error:
+        _fail_job(session, job_id, str(error))
+        flash(request, str(error))
+        return _redirect(f"/admin/dosen/{lecturer_id}/impor")
+    except Exception as error:
+        _fail_job(session, job_id, f"Impor gagal: {error}")
+        flash(request, f"Impor gagal: {error}")
+        return _redirect(f"/admin/dosen/{lecturer_id}/impor")
+    finally:
+        if client is not None:
+            client.close()
+
+    done = session.get(SyncJob, job_id)
+    if done is not None:
+        done.status = "done"
+        done.finished_at = utcnow()
+        done.new_papers = stats.new
+        done.credits_used = float(result.credits)
+        session.add(done)
+    lecturer.last_synced_at = utcnow()
+    lecturer.updated_at = utcnow()
+    session.add(lecturer)
+    session.commit()
+
+    flash(
+        request,
+        f"Impor {filename}: {stats.new} paper baru, {stats.merged} diperbarui, "
+        f"{stats.duplicates} kandidat duplikat.",
+    )
+    return _redirect(f"/admin/dosen/{lecturer_id}")
+
+
+@router.get("/duplikat")
+def duplicate_list(request: Request, session: Session = Depends(get_session)):
+    rows = session.exec(
+        select(PaperDuplicate)
+        .where(PaperDuplicate.status == "pending")
+        .order_by(PaperDuplicate.created_at.desc())
+    ).all()
+    items = []
+    for row in rows:
+        paper = session.get(Paper, row.paper_id)
+        candidate = session.get(Paper, row.candidate_id)
+        if paper is None or candidate is None:
+            continue
+        items.append(
+            {
+                "row": row,
+                "paper": paper,
+                "candidate": candidate,
+                "percent": round(row.similarity * 100, 1),
+            }
+        )
+    return render(request, "admin/duplicates.html", items=items)
+
+
+@router.post("/duplikat/{duplicate_id}/gabung")
+def duplicate_merge(
+    request: Request,
+    duplicate_id: int,
+    session: Session = Depends(get_session),
+):
+    duplicate = session.get(PaperDuplicate, duplicate_id)
+    if duplicate is None or duplicate.status != "pending":
+        flash(request, "Kandidat duplikat tidak ditemukan atau sudah diproses.")
+        return _redirect("/admin/duplikat")
+
+    paper = session.get(Paper, duplicate.paper_id)
+    candidate = session.get(Paper, duplicate.candidate_id)
+    if paper is None or candidate is None:
+        flash(request, "Salah satu paper sudah tidak ada.")
+        return _redirect("/admin/duplikat")
+
+    for link in session.exec(select(LecturerPaper).where(LecturerPaper.paper_id == paper.id)).all():
+        exists = session.exec(
+            select(LecturerPaper).where(
+                LecturerPaper.lecturer_id == link.lecturer_id,
+                LecturerPaper.paper_id == candidate.id,
+            )
+        ).first()
+        if exists:
+            session.delete(link)
+        else:
+            link.paper_id = candidate.id
+            session.add(link)
+
+    for topic_link in session.exec(select(PaperTopic).where(PaperTopic.paper_id == paper.id)).all():
+        exists = session.exec(
+            select(PaperTopic).where(
+                PaperTopic.paper_id == candidate.id,
+                PaperTopic.topic_id == topic_link.topic_id,
+            )
+        ).first()
+        if exists:
+            session.delete(topic_link)
+        else:
+            topic_link.paper_id = candidate.id
+            session.add(topic_link)
+
+    merge_paper_into(candidate, paper)
+    session.add(candidate)
+
+    for row in session.exec(
+        select(PaperDuplicate).where(
+            (PaperDuplicate.paper_id == paper.id) | (PaperDuplicate.candidate_id == paper.id)
+        )
+    ).all():
+        session.delete(row)
+
+    session.flush()
+    session.delete(paper)
+    session.commit()
+    flash(request, "Paper digabung. Paper yang lebih lengkap dipertahankan.")
+    return _redirect("/admin/duplikat")
+
+
+@router.post("/duplikat/{duplicate_id}/biarkan")
+def duplicate_keep(
+    request: Request,
+    duplicate_id: int,
+    session: Session = Depends(get_session),
+):
+    duplicate = session.get(PaperDuplicate, duplicate_id)
+    if duplicate is not None and duplicate.status == "pending":
+        duplicate.status = "kept"
+        session.add(duplicate)
+        session.commit()
+        flash(request, "Kandidat ditandai bukan duplikat.")
+    return _redirect("/admin/duplikat")
 
 
 def _taxonomy_rows(session: Session) -> list[dict[str, object]]:

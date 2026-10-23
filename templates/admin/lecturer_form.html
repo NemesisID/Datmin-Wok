@@ -75,5 +75,86 @@
     <button type="submit" class="tombol sekunder">Petakan</button>
   </form>
 </section>
+
+<section class="bagian">
+  <div class="judul-halaman">
+    <h2>Publikasi</h2>
+    <a class="tombol sekunder" href="/admin/dosen/{{ lecturer.id }}/impor">Impor CSV/BibTeX Scholar</a>
+  </div>
+  <p class="petunjuk">Paper digabung berdasarkan DOI, ID OpenAlex, ID Scholar, atau judul.
+  Abstrak tidak dipakai untuk menentukan duplikat.</p>
+
+  {% if papers %}
+  <div class="tabel-scroll">
+    <table>
+      <thead>
+        <tr><th>Judul</th><th>Tahun</th><th>Venue</th><th>Sitasi</th><th>Sumber</th><th>DOI</th></tr>
+      </thead>
+      <tbody>
+        {% for paper in papers %}
+        <tr>
+          <td>{{ paper.title }}</td>
+          <td>{{ paper.year or "—" }}</td>
+          <td>{{ paper.venue or "—" }}</td>
+          <td>{{ paper.citations }}</td>
+          <td>
+            {% for sumber in paper.sources or [] %}
+            <span class="lencana">{{ sumber }}</span>
+            {% endfor %}
+          </td>
+          <td>
+            {% if paper.doi %}<code>{{ paper.doi }}</code>{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="kosong">Belum ada publikasi. Sinkronkan dari OpenAlex atau impor ekspor Scholar.</p>
+  {% endif %}
+</section>
+
+<section class="bagian">
+  <h2>Sinkronisasi</h2>
+  <p class="petunjuk">Tombol ini hanya membuat job. Prosesnya dijalankan dari terminal:
+  <code>uv run python -m app.jobs sync</code>. Dosen yang disinkronkan dalam 7 hari terakhir
+  dilewati kecuali memakai <code>--force</code>.</p>
+
+  <form method="post" action="/admin/dosen/{{ lecturer.id }}/sinkronkan">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="tombol">Sinkronkan sekarang</button>
+  </form>
+
+  {% if jobs %}
+  <div class="tabel-scroll">
+    <table>
+      <thead>
+        <tr><th>Job</th><th>Sumber</th><th>Status</th><th>Paper baru</th><th>Kredit</th><th>Selesai</th><th>Galat</th></tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr>
+          <td>{{ job.id }}</td>
+          <td>{{ job.source }}</td>
+          <td>
+            {% if job.status == "done" %}<span class="lencana hijau">selesai</span>
+            {% elif job.status == "failed" %}<span class="lencana merah">gagal</span>
+            {% elif job.status == "running" %}<span class="lencana">berjalan</span>
+            {% else %}<span class="lencana abu">menunggu</span>{% endif %}
+          </td>
+          <td>{{ job.new_papers }}</td>
+          <td>{{ "%.4f"|format(job.credits_used) }}</td>
+          <td>{{ job.finished_at.strftime("%Y-%m-%d %H:%M") if job.finished_at else "—" }}</td>
+          <td class="kecil">{{ job.error or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="kosong">Belum ada job sinkronisasi untuk dosen ini.</p>
+  {% endif %}
+</section>
 {% endif %}
 {% endblock %}

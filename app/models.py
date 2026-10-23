@@ -69,7 +69,7 @@ class Paper(SQLModel, table=True):
     doi_norm: str | None = Field(default=None, unique=True, index=True)
     abstract: str | None = None
     citations: int = 0
-    scholar_pub_id: str | None = None
+    scholar_pub_id: str | None = Field(default=None, index=True)
     openalex_id: str | None = Field(default=None, unique=True)
     sources: list[str] | None = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=utcnow)
@@ -83,6 +83,18 @@ class LecturerPaper(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     lecturer_id: int = Field(foreign_key="lecturers.id", index=True)
     paper_id: int = Field(foreign_key="papers.id", index=True)
+
+
+class PaperDuplicate(SQLModel, table=True):
+    __tablename__ = "paper_duplicates"
+    __table_args__ = (UniqueConstraint("paper_id", "candidate_id"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    paper_id: int = Field(foreign_key="papers.id", index=True)
+    candidate_id: int = Field(foreign_key="papers.id", index=True)
+    similarity: float = 0.0
+    status: str = Field(default="pending", index=True)
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class Topic(SQLModel, table=True):

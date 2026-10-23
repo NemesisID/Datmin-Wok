@@ -113,6 +113,7 @@ tr.anak td:first-child { padding-left: 1.6rem; }
   background: var(--latar-lemah);
 }
 .lencana.hijau { border-color: #b5d6c2; background: #eef8f1; color: var(--hijau); }
+.lencana.merah { border-color: #e3b4b4; background: #fdf1f1; color: var(--bahaya); }
 .lencana.abu { color: var(--teks-lemah); }
 
 .kosong {

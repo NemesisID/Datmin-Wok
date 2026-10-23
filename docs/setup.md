@@ -95,6 +95,33 @@ Panel admin ada di http://127.0.0.1:8000/admin. Di dalamnya:
 
 1. **Dosen**: tambah dosen, tempel URL Scholar, lalu petakan ID OpenAlex.
 2. **Taksonomi**: periksa topik, lab, dan kata kunci. Setiap simpan menaikkan versi taksonomi.
+3. **Publikasi**: lihat paper per dosen, buat job sinkronisasi, dan impor ekspor Scholar.
+4. **Duplikat**: periksa judul yang mirip 90 sampai 100 persen pada tahun yang sama.
+
+### Menyinkronkan publikasi
+
+Tombol **Sinkronkan sekarang** di halaman dosen hanya membuat job `pending`. Prosesnya
+dijalankan dari terminal supaya tidak ada pekerjaan jaringan di dalam request:
+
+```powershell
+uv run python -m app.jobs sync                # semua dosen aktif yang punya ID OpenAlex
+uv run python -m app.jobs sync --force        # abaikan jeda 7 hari
+uv run python -m app.jobs sync --lecturer 3   # satu dosen saja
+```
+
+Dosen yang disinkronkan dalam 7 hari terakhir dilewati, kecuali job dibuat lewat tombol admin
+atau memakai `--force`. Job yang berstatus `running` lebih dari 30 menit dianggap gagal dan
+bisa diulang. Jumlah paper baru, kredit OpenAlex, dan galat tercatat di tabel `sync_jobs` dan
+tampil di halaman dosen.
+
+### Impor ekspor Scholar
+
+Halaman dosen punya tombol **Impor CSV/BibTeX Scholar**. Berkas maksimal 10 MB, format `.csv`,
+`.bib`, atau `.bibtex`. CSV minimal punya kolom `title` atau `judul`; kolom `year`, `venue`,
+`doi`, dan `citations` dipakai kalau ada. Paper digabung berdasarkan DOI, ID OpenAlex, ID
+Scholar, atau judul. Judul yang mirip 90 sampai 100 persen pada tahun yang sama tidak digabung
+otomatis, tetapi masuk antrean **Duplikat** untuk diputuskan admin. Abstrak yang kosong dicari
+ke OpenAlex lewat pencocokan judul.
 
 Perintah CLI yang tersedia:
 
@@ -102,6 +129,7 @@ Perintah CLI yang tersedia:
 uv run python -m app.cli init-db            # migrasi database
 uv run python -m app.cli hash-password      # hash kata sandi admin
 uv run python -m app.cli import-taxonomy    # impor ulang seeds/taxonomy.yaml
+uv run python -m app.jobs sync              # sinkronisasi publikasi OpenAlex
 ```
 
 ## 5. Tes dan lint

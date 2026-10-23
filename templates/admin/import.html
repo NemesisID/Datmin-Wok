@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Impor publikasi · {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/admin/dosen/{{ lecturer.id }}">Kembali ke {{ lecturer.name }}</a></p>
+<h1>Impor publikasi</h1>
+<p class="petunjuk">Unggah ekspor Google Scholar berformat CSV atau BibTeX. Paper yang judulnya
+sudah ada akan digabung, bukan ditambahkan lagi. Abstrak yang kosong dicari ke OpenAlex lewat
+pencocokan judul.</p>
+
+<form method="post" action="/admin/dosen/{{ lecturer.id }}/impor"
+      enctype="multipart/form-data" class="formulir">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="field">
+    <label for="file">Berkas ekspor</label>
+    <input id="file" name="file" type="file" accept=".csv,.bib,.bibtex" required>
+    <p class="bantuan">Maksimal {{ max_mb }} MB. CSV minimal punya kolom <code>title</code>
+    atau <code>judul</code>.</p>
+  </div>
+  <button type="submit" class="tombol">Impor</button>
+</form>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Kandidat duplikat · {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Kandidat duplikat</h1>
+<p class="petunjuk">Judul yang mirip 90 sampai 100 persen pada tahun yang sama tidak digabung
+otomatis. Periksa pasangannya, lalu pilih gabung atau biarkan.</p>
+
+{% if not items %}
+<p class="kosong">Tidak ada kandidat duplikat yang menunggu.</p>
+{% endif %}
+
+{% for item in items %}
+<section class="bagian">
+  <h2>Kemiripan {{ item.percent }}%</h2>
+  <div class="tabel-scroll">
+    <table>
+      <thead><tr><th></th><th>Judul</th><th>Tahun</th><th>Venue</th><th>DOI</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Paper baru</td>
+          <td>{{ item.paper.title }}</td>
+          <td>{{ item.paper.year or "—" }}</td>
+          <td>{{ item.paper.venue or "—" }}</td>
+          <td>{% if item.paper.doi %}<code>{{ item.paper.doi }}</code>{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+          <td>Kandidat lama</td>
+          <td>{{ item.candidate.title }}</td>
+          <td>{{ item.candidate.year or "—" }}</td>
+          <td>{{ item.candidate.venue or "—" }}</td>
+          <td>{% if item.candidate.doi %}<code>{{ item.candidate.doi }}</code>{% else %}—{% endif %}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="formulir baris">
+    <form method="post" action="/admin/duplikat/{{ item.row.id }}/gabung">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="tombol">Gabung ke kandidat lama</button>
+    </form>
+    <form method="post" action="/admin/duplikat/{{ item.row.id }}/biarkan">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="tombol sekunder">Biarkan sebagai paper terpisah</button>
+    </form>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

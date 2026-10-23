@@ -32,6 +32,7 @@ def test_migrations_create_core_tables(tmp_path, monkeypatch) -> None:
         "topic_keywords",
         "papers",
         "paper_topics",
+        "paper_duplicates",
         "theses",
         "sync_jobs",
         "meta",

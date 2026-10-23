@@ -50,7 +50,7 @@ Di Windows, pakai skrip pembungkusnya:
 
 - [x] Fase 0: fondasi, spike OpenAlex
 - [x] Fase 1: skema, taksonomi, admin dasar
-- [ ] Fase 2: sinkronisasi publikasi
+- [x] Fase 2: sinkronisasi publikasi
 - [ ] Fase 3: klasifikasi dan review
 - [ ] Fase 4: upload skripsi
 - [ ] Fase 5: halaman publik, skor, deploy
