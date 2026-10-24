@@ -797,22 +797,39 @@ def taxonomy_list(request: Request, session: Session = Depends(get_session)):
 
 
 @router.post("/taksonomi/reklasifikasi")
-def taxonomy_reclassify(request: Request, session: Session = Depends(get_session)):
+def taxonomy_reclassify(
+    request: Request,
+    topik: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    topic_id: int | None = None
+    if topik.strip():
+        try:
+            topic_id = int(topik)
+        except ValueError:
+            flash(request, "Topik untuk klasifikasi ulang tidak valid.")
+            return _redirect("/admin/taksonomi")
+        if session.get(Topic, topic_id) is None:
+            flash(request, "Topik untuk klasifikasi ulang tidak ditemukan.")
+            return _redirect("/admin/taksonomi")
+
+    source = "reclassify" if topic_id is None else f"reclassify:{topic_id}"
     existing = session.exec(
-        select(SyncJob).where(SyncJob.source == "reclassify", SyncJob.status == "pending")
+        select(SyncJob).where(SyncJob.source == source, SyncJob.status == "pending")
     ).first()
     job = existing
     if job is None:
-        job = SyncJob(source="reclassify", status="pending")
+        job = SyncJob(source=source, status="pending")
         session.add(job)
         session.commit()
         session.refresh(job)
+    target = "semua topik" if topic_id is None else f"topik #{topic_id}"
     flash(
         request,
-        f"Job klasifikasi ulang #{job.id} dibuat. Jalankan "
+        f"Job klasifikasi ulang #{job.id} untuk {target} dibuat. Jalankan "
         "`uv run python -m app.jobs reclassify` untuk memproses.",
     )
-    return _redirect("/admin/taksonomi")
+    return _redirect(f"/admin/taksonomi/{topic_id}" if topic_id is not None else "/admin/taksonomi")
 
 
 @router.get("/taksonomi/baru")

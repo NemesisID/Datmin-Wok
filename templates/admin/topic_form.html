@@ -51,7 +51,7 @@
 <section class="bagian">
   <h2>Kata kunci</h2>
   <p class="petunjuk">Setiap simpan kata kunci menaikkan versi taksonomi.
-  Klasifikasi ulang otomatis menyusul di Fase 3.</p>
+  Klasifikasi ulang otomatis memakai versi terbaru.</p>
 
   {% if keywords %}
   <div class="tabel-scroll">
@@ -93,6 +93,18 @@
       <input id="lang" name="lang" placeholder="id / en">
     </div>
     <button type="submit" class="tombol sekunder">Tambah</button>
+  </form>
+</section>
+
+<section class="bagian">
+  <h2>Klasifikasi ulang topik ini</h2>
+  <p class="petunjuk">Job ini hanya memeriksa paper dan skripsi yang punya label lama
+  pada topik ini atau teks yang cocok dengan kata kunci topik ini. Topik anak
+  diproses bersama topik induk. Label manual yang dikunci tidak ditimpa.</p>
+  <form method="post" action="/admin/taksonomi/reklasifikasi">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="topik" value="{{ topic.id }}">
+    <button type="submit" class="tombol sekunder">Buat job untuk topik ini</button>
   </form>
 </section>
 {% endif %}

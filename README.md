@@ -67,4 +67,7 @@ Fase 5 selesai: halaman publik cari/filter, FTS5 dan klasifikasi query, profil d
 topik, perbandingan tiga dosen, skor shrinkage saat query dengan label kekuatan bukti, empat
 state, layout responsif, Docker Compose, serta backup SQLite harian/bulanan.
 
-Fase 6 menyusul sesuai bagian 13 PRD.
+Fase 6 selesai: klasifikasi Tahap 3 opsional lewat LLM (OpenAI-compatible atau Ollama),
+hanya untuk paper ambigu, cache `llm_cache` per judul+abstrak+`taxonomy_version`, label manual
+tetap terkunci, dan klasifikasi ulang bertopik. Default `USE_LLM=false`; panduan provider ada
+di `docs/setup.md`.

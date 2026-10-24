@@ -6,30 +6,72 @@ import argparse
 
 from sqlmodel import Session, select
 
-from app.classify import Classifier, reclassify_papers, reclassify_theses
+from app.classify import (
+    Classifier,
+    ReclassifyStats,
+    affected_ids,
+    reclassify_papers,
+    reclassify_theses,
+)
 from app.config import get_settings
 from app.db import get_engine
+from app.llm import build_llm_provider
 from app.models import SyncJob, utcnow
 from app.providers.openalex import OpenAlexProvider, build_client
 from app.sync import fail_stale_jobs, publication_window_start, run_jobs
 from app.taxonomy import get_taxonomy_version
 
+RECLASSIFY_SOURCE = "reclassify"
+
+
+def _topic_from_source(source: str) -> int | None:
+    if source == RECLASSIFY_SOURCE:
+        return None
+    prefix = f"{RECLASSIFY_SOURCE}:"
+    if not source.startswith(prefix):
+        raise ValueError(f"Sumber job klasifikasi tidak dikenal: {source}")
+    try:
+        return int(source[len(prefix) :])
+    except ValueError as error:
+        raise ValueError(f"ID topik pada job tidak valid: {source}") from error
+
+
+def _merge_stats(total: ReclassifyStats, item: ReclassifyStats) -> None:
+    total.scanned += item.scanned
+    total.labeled += item.labeled
+    total.labels += item.labels
+    total.skipped_reviewed += item.skipped_reviewed
+    total.llm_cached += item.llm_cached
+    total.llm_requests += item.llm_requests
+    total.llm_labeled += item.llm_labeled
+
 
 def cmd_sync(force: bool, lecturer_id: int | None) -> int:
     settings = get_settings()
     since = publication_window_start(settings)
-    client = build_client(settings.openalex_base_url, settings.openalex_api_key)
     try:
-        with Session(get_engine()) as session:
-            summary = run_jobs(
-                session,
-                OpenAlexProvider(client),
-                since,
-                force=force,
-                lecturer_id=lecturer_id,
-            )
+        llm = build_llm_provider(settings)
+    except ValueError as error:
+        print(f"Konfigurasi LLM tidak valid: {error}")
+        return 1
+    try:
+        client = build_client(settings.openalex_base_url, settings.openalex_api_key)
+        try:
+            with Session(get_engine()) as session:
+                summary = run_jobs(
+                    session,
+                    OpenAlexProvider(client),
+                    since,
+                    force=force,
+                    lecturer_id=lecturer_id,
+                    llm=llm,
+                    llm_batch_size=settings.llm_batch_size,
+                )
+        finally:
+            client.close()
     finally:
-        client.close()
+        if llm is not None:
+            llm.close()
 
     print(f"Jendela publikasi sejak {since.isoformat()}")
     print(
@@ -48,10 +90,14 @@ def cmd_sync(force: bool, lecturer_id: int | None) -> int:
 
 
 def cmd_reclassify() -> int:
+    settings = get_settings()
     with Session(get_engine()) as session:
         fail_stale_jobs(session)
         pending = session.exec(
-            select(SyncJob).where(SyncJob.source == "reclassify", SyncJob.status == "pending")
+            select(SyncJob).where(
+                SyncJob.source.like(f"{RECLASSIFY_SOURCE}%"),
+                SyncJob.status == "pending",
+            )
         ).all()
         job_ids = [job.id for job in pending]
         for job in pending:
@@ -61,12 +107,53 @@ def cmd_reclassify() -> int:
             session.add(job)
         session.commit()
 
+        provider = None
         try:
+            provider = build_llm_provider(settings)
             classifier = Classifier.from_session(session)
             version = get_taxonomy_version(session)
-            papers = reclassify_papers(session, classifier=classifier, version=version)
-            theses = reclassify_theses(session, classifier=classifier, version=version)
+
+            paper_ids: list[int] | None = None
+            thesis_ids: list[int] | None = None
+            mode = "semua"
+            if pending:
+                topic_ids: set[int] = set()
+                global_scope = False
+                for job in pending:
+                    topic_id = _topic_from_source(job.source)
+                    if topic_id is None:
+                        global_scope = True
+                    else:
+                        topic_ids.add(topic_id)
+                if not global_scope:
+                    selected_papers: set[int] = set()
+                    selected_theses: set[int] = set()
+                    for topic_id in sorted(topic_ids):
+                        paper_scope, thesis_scope = affected_ids(
+                            session, topic_id, classifier=classifier
+                        )
+                        selected_papers.update(paper_scope)
+                        selected_theses.update(thesis_scope)
+                    paper_ids = sorted(selected_papers)
+                    thesis_ids = sorted(selected_theses)
+                    mode = f"{len(paper_ids)} paper, {len(thesis_ids)} skripsi"
+
+            papers = reclassify_papers(
+                session,
+                paper_ids=paper_ids,
+                classifier=classifier,
+                version=version,
+                llm=provider,
+                llm_batch_size=settings.llm_batch_size,
+            )
+            theses = reclassify_theses(
+                session,
+                thesis_ids=thesis_ids,
+                classifier=classifier,
+                version=version,
+            )
         except Exception as error:
+            session.rollback()
             for job_id in job_ids:
                 job = session.get(SyncJob, job_id)
                 if job is not None:
@@ -77,17 +164,24 @@ def cmd_reclassify() -> int:
             session.commit()
             print(f"Klasifikasi ulang gagal: {error}")
             return 1
+        finally:
+            if provider is not None:
+                provider.close()
 
+        total = ReclassifyStats()
+        _merge_stats(total, papers)
+        _merge_stats(total, theses)
         for job_id in job_ids:
             job = session.get(SyncJob, job_id)
             if job is not None:
                 job.status = "done"
                 job.finished_at = utcnow()
-                job.new_papers = papers.labels + theses.labels
+                job.new_papers = total.labels
                 session.add(job)
         session.commit()
 
     print(f"taxonomy_version: {version}")
+    print(f"Cakupan: {mode}")
     print(
         f"Paper diperiksa: {papers.scanned}, berlabel: {papers.labeled}, "
         f"label dibuat: {papers.labels}, dilewati karena review: {papers.skipped_reviewed}"
@@ -96,6 +190,11 @@ def cmd_reclassify() -> int:
         f"Skripsi diperiksa: {theses.scanned}, berlabel: {theses.labeled}, "
         f"label dibuat: {theses.labels}, dilewati karena review: {theses.skipped_reviewed}"
     )
+    if provider is not None:
+        print(
+            f"LLM: cache={papers.llm_cached}, request={papers.llm_requests}, "
+            f"paper berlabel LLM={papers.llm_labeled}"
+        )
     return 0
 
 

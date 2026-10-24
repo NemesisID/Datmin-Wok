@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from sqlmodel import Session, select
 
@@ -19,6 +20,9 @@ from app.models import (
     utcnow,
 )
 from app.providers.base import ProviderResult, PublicationProvider, RawPaper
+
+if TYPE_CHECKING:
+    from app.llm import LLMProvider
 
 SYNC_SKIP_DAYS = 7
 STALE_MINUTES = 30
@@ -154,6 +158,8 @@ def run_job(
     author_ids: list[str],
     since: date,
     now: datetime | None = None,
+    llm: LLMProvider | None = None,
+    llm_batch_size: int = 20,
 ) -> tuple[ProviderResult, StoreStats]:
     job.status = "running"
     job.attempts += 1
@@ -166,7 +172,12 @@ def run_job(
     try:
         result = provider.fetch(lecturer, author_ids, since)
         stats = store_papers(session, lecturer, result.papers, provider.name)
-        reclassify_papers(session, paper_ids=stats.touched)
+        reclassify_papers(
+            session,
+            paper_ids=stats.touched,
+            llm=llm,
+            llm_batch_size=llm_batch_size,
+        )
     except Exception as error:
         session.rollback()
         failed = session.get(SyncJob, job.id)
@@ -200,6 +211,8 @@ def run_jobs(
     force: bool = False,
     lecturer_id: int | None = None,
     now: datetime | None = None,
+    llm: LLMProvider | None = None,
+    llm_batch_size: int = 20,
 ) -> SyncSummary:
     """Jalankan job sinkronisasi untuk dosen aktif yang punya ID OpenAlex."""
     now = now or utcnow()
@@ -240,7 +253,17 @@ def run_jobs(
 
         job = pending or enqueue_job(session, lecturer.id, source=provider.name)
         try:
-            result, stats = run_job(session, job, provider, lecturer, author_ids, since, now)
+            result, stats = run_job(
+                session,
+                job,
+                provider,
+                lecturer,
+                author_ids,
+                since,
+                now,
+                llm=llm,
+                llm_batch_size=llm_batch_size,
+            )
         except Exception:
             summary.failed += 1
             continue

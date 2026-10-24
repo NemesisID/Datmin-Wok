@@ -4,14 +4,20 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from sqlmodel import Session, select
 
 from app.models import Paper, PaperTopic, Thesis, ThesisTopic, Topic, TopicKeyword, utcnow
 from app.taxonomy import get_taxonomy_version, normalize_keyword
 
+if TYPE_CHECKING:
+    from app.llm import LLMProvider
+
 PAPER_THRESHOLD = 0.4
 THESIS_THRESHOLD = 0.5
+REVIEW_CONFIDENCE = 0.5
+REVIEW_GAP = 0.1
 
 
 @dataclass(frozen=True)
@@ -36,6 +42,9 @@ class ReclassifyStats:
     labeled: int = 0
     labels: int = 0
     skipped_reviewed: int = 0
+    llm_cached: int = 0
+    llm_requests: int = 0
+    llm_labeled: int = 0
 
 
 def normalize_text(text: str) -> str:
@@ -112,6 +121,17 @@ class Classifier:
         predictions.sort(key=lambda item: (-item[0], item[1]))
         return [prediction for _, _, prediction in predictions]
 
+    def matches_root(self, text: str, root_id: int) -> bool:
+        """True bila teks menyentuh kata kunci topik utama atau sub-topiknya."""
+        normalized = normalize_text(text)
+        for root in self.roots:
+            if root.id != root_id:
+                continue
+            if count_keyword_matches(normalized, root.keywords):
+                return True
+            return any(count_keyword_matches(normalized, child.keywords) for child in root.children)
+        return False
+
     @staticmethod
     def _pick_subtopic(root: TopicNode, normalized: str, threshold: float) -> int | None:
         best: TopicNode | None = None
@@ -126,6 +146,16 @@ class Classifier:
             if child.name.strip().lower() == "umum":
                 return child.id
         return None
+
+
+def is_ambiguous(predictions: list[TopicPrediction]) -> bool:
+    if not predictions:
+        return True
+    if predictions[0].confidence < REVIEW_CONFIDENCE:
+        return True
+    return (
+        len(predictions) >= 2 and predictions[0].confidence - predictions[1].confidence < REVIEW_GAP
+    )
 
 
 def _node(topic: Topic, keywords: dict[int, list[str]]) -> TopicNode:
@@ -148,6 +178,8 @@ def _replace_labels(
     item_id: int,
     predictions: list[TopicPrediction],
     version: int,
+    *,
+    source: str = "rule",
 ) -> int:
     existing = session.exec(select(model).where(getattr(model, id_field) == item_id)).all()
     locked_topics = {row.topic_id for row in existing if row.locked}
@@ -165,7 +197,7 @@ def _replace_labels(
             id_field: item_id,
             "topic_id": prediction.topic_id,
             "confidence": prediction.confidence,
-            "source": "rule",
+            "source": source,
             "locked": False,
             "taxonomy_version": version,
         }
@@ -183,6 +215,8 @@ def reclassify_papers(
     classifier: Classifier | None = None,
     version: int | None = None,
     commit: bool = True,
+    llm: LLMProvider | None = None,
+    llm_batch_size: int = 20,
 ) -> ReclassifyStats:
     classifier = classifier or Classifier.from_session(session)
     version = get_taxonomy_version(session) if version is None else version
@@ -193,15 +227,48 @@ def reclassify_papers(
         statement = statement.where(Paper.id.in_(paper_ids))
 
     stats = ReclassifyStats()
+    items: list[tuple[Paper, list[TopicPrediction]]] = []
     for paper in session.exec(statement).all():
         if paper.reviewed_at is not None:
             stats.skipped_reviewed += 1
             continue
         predictions = classifier.classify(paper_text(paper), PAPER_THRESHOLD)
-        stats.labels += _replace_labels(
-            session, PaperTopic, "paper_id", paper.id, predictions, version
-        )
+        items.append((paper, predictions))
         stats.scanned += 1
+
+    llm_result = None
+    if llm is not None:
+        ambiguous = [paper for paper, predictions in items if is_ambiguous(predictions)]
+        if ambiguous:
+            from app.llm import classify_papers
+
+            llm_result = classify_papers(
+                session,
+                llm,
+                classifier,
+                ambiguous,
+                version,
+                batch_size=llm_batch_size,
+            )
+            stats.llm_cached = llm_result.cached
+            stats.llm_requests = llm_result.requests
+
+    for paper, predictions in items:
+        source = "rule"
+        if llm_result is not None and paper.id in llm_result.labels:
+            predictions = llm_result.labels[paper.id]
+            source = "llm"
+            if predictions:
+                stats.llm_labeled += 1
+        stats.labels += _replace_labels(
+            session,
+            PaperTopic,
+            "paper_id",
+            paper.id,
+            predictions,
+            version,
+            source=source,
+        )
         if predictions:
             stats.labeled += 1
     if commit:
@@ -240,6 +307,46 @@ def reclassify_theses(
     if commit:
         session.commit()
     return stats
+
+
+def affected_ids(
+    session: Session,
+    topic_id: int,
+    *,
+    classifier: Classifier | None = None,
+) -> tuple[list[int], list[int]]:
+    """Paper dan skripsi yang mungkin berubah bila satu topik diedit.
+
+    Cakupan mencakup label lama pada topik itu dan teks yang cocok dengan kata kunci
+    topik saat ini. Topik anak dipetakan ke topik induk karena label disimpan di induk.
+    """
+    topic = session.get(Topic, topic_id)
+    if topic is None:
+        raise ValueError("Topik tidak ditemukan.")
+    root_id = topic.parent_id or topic.id
+    classifier = classifier or Classifier.from_session(session)
+
+    paper_ids = {
+        row.paper_id
+        for row in session.exec(select(PaperTopic).where(PaperTopic.topic_id == root_id)).all()
+    }
+    for paper in session.exec(select(Paper)).all():
+        if paper.id in paper_ids:
+            continue
+        if classifier.matches_root(paper_text(paper), root_id):
+            paper_ids.add(paper.id)
+
+    thesis_ids = {
+        row.thesis_id
+        for row in session.exec(select(ThesisTopic).where(ThesisTopic.topic_id == root_id)).all()
+    }
+    for thesis in session.exec(select(Thesis)).all():
+        if thesis.id in thesis_ids:
+            continue
+        if classifier.matches_root(thesis.title, root_id):
+            thesis_ids.add(thesis.id)
+
+    return sorted(paper_ids), sorted(thesis_ids)
 
 
 def set_manual_label(

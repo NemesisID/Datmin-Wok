@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     use_llm: bool = False
     llm_provider: str = ""
     llm_model: str = ""
+    llm_base_url: str = ""
+    llm_api_key: str = ""
+    llm_batch_size: int = 20
+    llm_timeout_seconds: float = 30.0
 
     admin_username: str = "admin"
     admin_password_hash: str = ""

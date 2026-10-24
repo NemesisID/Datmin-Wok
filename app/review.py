@@ -6,10 +6,8 @@ from dataclasses import dataclass, field
 
 from sqlmodel import Session, select
 
+from app.classify import REVIEW_CONFIDENCE, REVIEW_GAP
 from app.models import Paper, PaperTopic, Thesis, ThesisTopic, Topic
-
-REVIEW_CONFIDENCE = 0.5
-REVIEW_GAP = 0.1
 
 
 @dataclass

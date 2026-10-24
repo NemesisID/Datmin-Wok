@@ -71,6 +71,12 @@ Buka `.env` dan sesuaikan. Bagian yang wajib diisi hanya kata sandi admin.
 | `LOGIN_MAX_ATTEMPTS` | Batas percobaan login per IP | `5` |
 | `LOGIN_WINDOW_SECONDS` | Jendela waktu pembatasan login | `900` |
 | `USE_LLM` | Klasifikasi tahap 3 dengan LLM | `false` |
+| `LLM_PROVIDER` | `openai` (OpenAI-compatible) atau `ollama` | kosong |
+| `LLM_MODEL` | Nama model yang dipakai provider | kosong |
+| `LLM_BASE_URL` | Alamat API provider | tergantung provider |
+| `LLM_API_KEY` | Kunci API provider OpenAI-compatible | kosong |
+| `LLM_BATCH_SIZE` | Jumlah paper per panggilan LLM | `20` |
+| `LLM_TIMEOUT_SECONDS` | Batas waktu satu panggilan LLM | `30` |
 
 Tanpa API key aplikasi tetap jalan, tetapi dibatasi sekitar 10 request per detik.
 
@@ -100,7 +106,8 @@ Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health
 Panel admin ada di http://127.0.0.1:8000/admin. Di dalamnya:
 
 1. **Dosen**: tambah dosen, tempel URL Scholar, lalu petakan ID OpenAlex.
-2. **Taksonomi**: periksa topik, lab, dan kata kunci. Setiap simpan menaikkan versi taksonomi.
+2. **Taksonomi**: periksa topik, lab, dan kata kunci. Setiap simpan menaikkan versi
+   taksonomi. Klasifikasi ulang bisa untuk semua topik atau satu topik saja.
 3. **Review**: tinjau paper dan skripsi tanpa topik, dengan keyakinan rendah, atau dua topik
    berdekatan. Pilihan manual dikunci dan tidak ditimpa klasifikasi ulang.
 4. **Publikasi**: lihat paper per dosen, buat job sinkronisasi, dan impor ekspor Scholar.
@@ -206,9 +213,50 @@ jalankan:
 uv run python -m app.jobs reclassify
 ```
 
+Tombol di halaman taksonomi memproses semua topik. Untuk cakupan lebih kecil, buka satu topik
+dan tekan **Buat job untuk topik ini**. Job bertopik hanya memeriksa paper dan skripsi yang
+punya label lama pada topik itu atau teksnya cocok dengan kata kunci topik saat ini; topik anak
+diproses bersama topik induk.
+
 Job ini mengklasifikasi ulang paper dan skripsi yang belum ditinjau. Label `locked=true` dan
 keputusan "tidak relevan" tetap dipertahankan. Versi taksonomi ikut dicatat di setiap label.
 Setelah memperbarui dari Fase 2, jalankan sekali agar paper lama ikut berlabel.
+
+### LLM opsional (Tahap 3)
+
+Aturan kata kunci tetap berjalan lebih dulu. LLM hanya dipanggil untuk paper yang masih ambigu:
+tanpa topik, keyakinan di bawah 0,5, atau selisih dua topik teratas kurang dari 0,1. Hasil LLM
+disimpan dengan `source="llm"`. Label manual yang dikunci dan paper yang sudah ditinjau tidak
+pernah ditimpa.
+
+Default `USE_LLM=false`, jadi aplikasi berjalan tanpa jaringan ke LLM. Untuk menyalakan
+provider OpenAI-compatible:
+
+```dotenv
+USE_LLM=true
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4o-mini
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_API_KEY=isi-kunci
+```
+
+Untuk Ollama lokal:
+
+```dotenv
+USE_LLM=true
+LLM_PROVIDER=ollama
+LLM_MODEL=qwen2.5:7b
+LLM_BASE_URL=http://127.0.0.1:11434
+```
+
+Setelah itu jalankan `uv run python -m app.jobs sync` atau
+`uv run python -m app.jobs reclassify`. Hanya judul dan abstrak yang dikirim ke provider.
+
+Hasil disimpan di tabel `llm_cache` dengan kunci
+`sha256(judul + abstrak + taxonomy_version)`. Paper dengan isi dan versi taksonomi yang sama
+tidak memanggil LLM lagi. Mengubah kata kunci menaikkan versi taksonomi, sehingga cache lama
+tidak dipakai. Bila provider gagal, job ditandai gagal dan label dari proses itu tidak
+setengah tersimpan. Kunci API tidak pernah ditulis ke log atau query string.
 
 Perintah CLI yang tersedia:
 

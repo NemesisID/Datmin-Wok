@@ -6,6 +6,9 @@ from sqlmodel import select
 
 from app.classify import (
     Classifier,
+    TopicPrediction,
+    affected_ids,
+    is_ambiguous,
     mark_not_relevant,
     normalize_text,
     reclassify_papers,
@@ -189,3 +192,52 @@ def test_reviewed_at_excludes_paper_from_reclassification(session) -> None:
 
     assert stats.scanned == 0
     assert stats.skipped_reviewed == 1
+
+
+def test_is_ambiguous_uses_review_thresholds() -> None:
+    assert is_ambiguous([])
+    assert is_ambiguous([TopicPrediction(1, None, 0.4)])
+    assert is_ambiguous([TopicPrediction(1, None, 0.55), TopicPrediction(2, None, 0.5)])
+    assert not is_ambiguous([TopicPrediction(1, None, 0.6)])
+    assert not is_ambiguous([TopicPrediction(1, None, 0.72), TopicPrediction(2, None, 0.6)])
+
+
+def test_affected_ids_covers_old_labels_and_keyword_matches(session) -> None:
+    taxonomy = seed_minimal_taxonomy(session)
+    labeled = make_paper(session, "Judul lama tanpa kata kunci")
+    matched = make_paper(session, "data mining klasifikasi")
+    unrelated = make_paper(session, "usability design thinking")
+    labeled_thesis = make_thesis(session, "Skripsi lama")
+    matched_thesis = make_thesis(session, "analisis sentimen twitter")
+    mining_id = taxonomy["Data Mining"].id
+    session.add(
+        PaperTopic(
+            paper_id=labeled.id,
+            topic_id=mining_id,
+            confidence=1.0,
+            source="manual",
+            locked=True,
+            taxonomy_version=1,
+        )
+    )
+    session.add(
+        ThesisTopic(
+            thesis_id=labeled_thesis.id,
+            topic_id=mining_id,
+            confidence=1.0,
+            source="manual",
+            locked=True,
+            taxonomy_version=1,
+        )
+    )
+    session.commit()
+
+    paper_ids, thesis_ids = affected_ids(session, mining_id)
+
+    assert set(paper_ids) == {labeled.id, matched.id}
+    assert set(thesis_ids) == {labeled_thesis.id, matched_thesis.id}
+    assert unrelated.id not in paper_ids
+
+    child_paper_ids, child_thesis_ids = affected_ids(session, taxonomy["Analisis Sentimen"].id)
+    assert set(child_paper_ids) == {labeled.id, matched.id}
+    assert set(child_thesis_ids) == {labeled_thesis.id, matched_thesis.id}

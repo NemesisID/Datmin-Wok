@@ -4,7 +4,7 @@ from conftest import csrf_from, login
 from factories import make_paper, make_thesis, seed_minimal_taxonomy
 from sqlmodel import Session, select
 
-from app.models import Paper, PaperTopic, SyncJob, Thesis, ThesisTopic
+from app.models import Paper, PaperTopic, SyncJob, Thesis, ThesisTopic, Topic
 
 
 def test_review_page_lists_pending_paper(client, engine) -> None:
@@ -118,6 +118,29 @@ def test_taxonomy_reclassify_button_enqueues_job(client, engine) -> None:
     assert response.status_code == 303
     with Session(engine) as session:
         job = session.exec(select(SyncJob).where(SyncJob.source == "reclassify")).one()
+    assert job.status == "pending"
+
+
+def test_topic_reclassify_button_enqueues_scoped_job(client, engine) -> None:
+    with Session(engine) as session:
+        topic = Topic(name="Data Mining", sort_order=10)
+        session.add(topic)
+        session.commit()
+        session.refresh(topic)
+        topic_id = topic.id
+
+    login(client)
+    page = client.get(f"/admin/taksonomi/{topic_id}")
+    response = client.post(
+        "/admin/taksonomi/reklasifikasi",
+        data={"csrf_token": csrf_from(page), "topik": str(topic_id)},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/admin/taksonomi/{topic_id}"
+    with Session(engine) as session:
+        job = session.exec(select(SyncJob).where(SyncJob.source == f"reclassify:{topic_id}")).one()
     assert job.status == "pending"
 
 

@@ -55,6 +55,6 @@ Di Windows, pakai skrip pembungkusnya:
 - [x] Fase 3: klasifikasi dan review
 - [x] Fase 4: upload skripsi
 - [x] Fase 5: halaman publik, skor, deploy
-- [ ] Fase 6: LLM opsional dan poles
+- [x] Fase 6: LLM opsional dan poles
 
 Mulai setiap fase dengan rencana singkat, lalu tunggu persetujuan. Akhiri setiap fase dengan tes, ringkasan, dan berhenti.
