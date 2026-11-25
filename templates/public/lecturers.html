@@ -12,18 +12,21 @@
   {{ freshness(result.latest_sync, result.stale, result.stale_days) }}
 </div>
 
-<form method="get" action="/dosen" class="form-filter-lab" aria-label="Filter lab">
-  <div class="field pendek">
-    <label for="lab-dosen">Lab</label>
-    <select id="lab-dosen" name="lab">
-      <option value="" {% if not lab %}selected{% endif %}>Semua lab</option>
-      {% for pilihan in options.labs %}
-      <option value="{{ pilihan }}" {% if lab == pilihan %}selected{% endif %}>{{ pilihan }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <button type="submit" class="tombol sekunder">Terapkan</button>
-</form>
+<section class="panel-filter">
+  <h2>Filter dosen</h2>
+  <form method="get" action="/dosen" class="form-filter-lab" aria-label="Filter lab">
+    <div class="field pendek">
+      <label for="lab-dosen">Lab</label>
+      <select id="lab-dosen" name="lab">
+        <option value="" {% if not lab %}selected{% endif %}>Semua lab</option>
+        {% for pilihan in options.labs %}
+        <option value="{{ pilihan }}" {% if lab == pilihan %}selected{% endif %}>{{ pilihan }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="tombol sekunder">Terapkan</button>
+  </form>
+</section>
 
 {% if result.no_data_state %}
 <section class="kosong" aria-labelledby="belum-data">

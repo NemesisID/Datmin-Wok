@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Impor dosen · {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="/admin/dosen">Kembali ke daftar dosen</a></p>
+<h1>Impor dosen dari CSV</h1>
+<p class="petunjuk">Berkas CSV langsung diperiksa dan disimpan. Baris yang sudah ada diperbarui,
+bukan dibuat dua kali. Baris yang bermasalah dilaporkan tanpa menghentikan baris lainnya.</p>
+
+<form method="post" action="/admin/dosen/impor" enctype="multipart/form-data" class="formulir">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="field">
+    <label for="file">Berkas CSV dosen</label>
+    <input id="file" name="file" type="file" accept=".csv" required>
+    <p class="bantuan">Maksimal 10 MB. Kolom yang dikenali: <code>nama</code>,
+      <code>gelar</code>, <code>url_scholar</code>, <code>openalex_id</code>,
+      <code>aktif</code>, dan <code>catatan</code>. Kolom lain diabaikan.</p>
+  </div>
+  <button type="submit" class="tombol">Impor dosen</button>
+</form>
+
+<section class="bagian" aria-labelledby="aturan-impor">
+  <h2 id="aturan-impor">Cara kerja</h2>
+  <ul class="daftar">
+    <li>Nama dibandingkan dengan versi tanpa gelar sehingga <em>Dr. Budi Santoso</em> dan
+    <em>Budi Santoso</em> dianggap dosen yang sama.</li>
+    <li>ID OpenAlex yang sudah dipakai dosen lain ditoLak agar publikasi tidak tercampur.</li>
+    <li>Kolom <code>aktif</code> bisa dituliskan <code>true</code>, <code>false</code>,
+      <code>ya</code>, atau <code>tidak</code>.</li>
+  </ul>
+</section>
+{% endblock %}

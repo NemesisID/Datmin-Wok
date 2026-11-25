@@ -12,6 +12,7 @@ from app.classify import mark_not_relevant, reclassify_papers, set_manual_label
 from app.config import get_settings
 from app.db import get_session
 from app.dedupe import merge_paper_into
+from app.lecturer_import import import_lecturers
 from app.models import (
     LABS,
     ImportBatch,
@@ -71,6 +72,7 @@ async def csrf_guard(request: Request) -> None:
 router = APIRouter(prefix="/admin", dependencies=[Depends(csrf_guard)])
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_IMPORT_BYTES = MAX_UPLOAD_BYTES
 IMPORT_SUFFIXES = (".csv", ".bib", ".bibtex")
 THESIS_SUFFIXES = (".csv", ".xlsx")
 THESIS_PAGE_SIZE = 100
@@ -217,6 +219,54 @@ def lecturer_list(request: Request, session: Session = Depends(get_session)):
 @router.get("/dosen/baru")
 def lecturer_new_form(request: Request):
     return render(request, "admin/lecturer_form.html", lecturer=None, openalex_ids=[])
+
+
+@router.get("/dosen/impor")
+def lecturer_csv_import_form(request: Request):
+    return render(request, "admin/lecturer_import.html")
+
+
+@router.post("/dosen/impor")
+def lecturer_csv_import(
+    request: Request,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+):
+    """Impor dosen dari CSV langsung ke data web."""
+    filename = (file.filename or "").casefold()
+    if not filename.endswith(".csv"):
+        flash(request, "Berkas harus berupa CSV dengan baris data dosen.")
+        return _redirect("/admin/dosen/impor")
+
+    content = file.file.read(MAX_IMPORT_BYTES + 1)
+    if not content:
+        flash(request, "Berkas kosong.")
+        return _redirect("/admin/dosen/impor")
+    if len(content) > MAX_IMPORT_BYTES:
+        flash(request, "Berkas terlalu besar. Misalnya maksimal 10 MB.")
+        return _redirect("/admin/dosen/impor")
+
+    try:
+        summary = import_lecturers(session, content)
+    except ValueError as error:
+        flash(request, str(error))
+        return _redirect("/admin/dosen/impor")
+    if summary.created or summary.updated:
+        details = [
+            f"{summary.created} dosen baru",
+            f"{summary.updated} dosen diperbarui",
+            f"{summary.openalex_added} ID OpenAlex dipetakan",
+        ]
+        flash(request, "Impor dosen selesai. " + ", ".join(details) + ".")
+    if summary.errors:
+        flash(request, "Beberapa baris dilewati. Lihat catatan di halaman ini.")
+        for error in summary.errors[:5]:
+            flash(request, error)
+        if len(summary.errors) > 5:
+            flash(request, f"... dan {len(summary.errors) - 5} galat lainnya.")
+    if not summary.created and not summary.updated and not summary.errors:
+        flash(request, "Tidak ada baris dosen yang bisa diimpor.")
+    return _redirect("/admin/dosen")
 
 
 @router.post("/dosen/baru")
